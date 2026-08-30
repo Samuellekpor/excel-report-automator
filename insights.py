@@ -89,6 +89,8 @@ def _looks_datetime(series: pd.Series) -> bool:
         return False
     if sample.str.contains(r"@", regex=True).mean() > 0.3:
         return False
+    if sample.str.contains(r"\d", regex=True).mean() < 0.6:
+        return False
     parsed = pd.to_datetime(sample, errors="coerce")
     return parsed.notna().mean() >= 0.8
 
