@@ -6,10 +6,30 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from insights import classify_columns, coerce_datetime
+from ui import section_header
+
+CHART_LAYOUT = dict(
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="#0A0A0C",
+    font=dict(family="Plus Jakarta Sans, sans-serif", color="#F3F1EC", size=12),
+    title=dict(font=dict(family="Syne, sans-serif", size=16, color="#F3F1EC")),
+    margin=dict(l=40, r=24, t=56, b=40),
+    colorway=["#5EEAD4", "#C4B5FD", "#F3F1EC", "#67E8F9"],
+)
+
+
+def _style(fig, **layout) -> None:
+    fig.update_layout(**CHART_LAYOUT, **layout)
+    fig.update_xaxes(gridcolor="rgba(255,255,255,0.06)", zerolinecolor="rgba(255,255,255,0.08)")
+    fig.update_yaxes(gridcolor="rgba(255,255,255,0.06)", zerolinecolor="rgba(255,255,255,0.08)")
 
 
 def render_charts(df: pd.DataFrame) -> None:
-    st.markdown("## Charts")
+    section_header(
+        "03  ·  Evidence",
+        "Charts",
+        "Distributions, categories, correlation, and time — only where the data supports them.",
+    )
     types = classify_columns(df)
 
     if types["numeric"]:
@@ -19,7 +39,8 @@ def render_charts(df: pd.DataFrame) -> None:
             if series.empty:
                 continue
             fig = px.histogram(series, x=series.name or col, nbins=30, title=f"Histogram — {col}")
-            fig.update_layout(xaxis_title=col, yaxis_title="Count", bargap=0.05)
+            _style(fig, xaxis_title=col, yaxis_title="Count", bargap=0.05)
+            fig.update_traces(marker_color="#5EEAD4", marker_line_width=0)
             st.plotly_chart(fig, use_container_width=True)
 
     cat_cols = types["categorical"] + types["text"]
@@ -35,6 +56,8 @@ def render_charts(df: pd.DataFrame) -> None:
                 title=f"Top 10 values — {col}",
                 labels={"x": col, "y": "Count"},
             )
+            _style(fig)
+            fig.update_traces(marker_color="#C4B5FD")
             st.plotly_chart(fig, use_container_width=True)
 
     if len(types["numeric"]) >= 2:
@@ -45,14 +68,14 @@ def render_charts(df: pd.DataFrame) -> None:
                 z=corr.values,
                 x=list(corr.columns),
                 y=list(corr.index),
-                colorscale="RdBu",
+                colorscale=[[0, "#5EEAD4"], [0.5, "#0A0A0C"], [1, "#C4B5FD"]],
                 zmid=0,
                 zmin=-1,
                 zmax=1,
                 colorbar=dict(title="corr"),
             )
         )
-        fig.update_layout(title="Numeric correlation")
+        _style(fig, title="Numeric correlation")
         st.plotly_chart(fig, use_container_width=True)
 
     if types["datetime"] and types["numeric"]:
@@ -73,7 +96,8 @@ def render_charts(df: pd.DataFrame) -> None:
                 title=f"{num_col} over time ({date_col})",
                 markers=True,
             )
-            fig.update_layout(xaxis_title=date_col, yaxis_title=num_col)
+            _style(fig, xaxis_title=date_col, yaxis_title=num_col)
+            fig.update_traces(line_color="#5EEAD4", line_width=2.4)
             st.plotly_chart(fig, use_container_width=True)
 
     if not types["numeric"] and not cat_cols:
