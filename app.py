@@ -1,16 +1,56 @@
 from __future__ import annotations
 
+from html import escape
 from io import BytesIO
 
 import pandas as pd
 import streamlit as st
 
+from charts import render_charts
 from insights import generate_insights
 from profiling import categorical_profile, dataset_overview, numeric_profile
-from charts import render_charts
 from reports import build_reports
 
-st.set_page_config(page_title="Excel Report Automator", layout="wide")
+DATA_CLEANING_TOOL_URL = "https://example.com/data-cleaning-tool"
+
+st.set_page_config(
+    page_title="Excel Report Automator",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+st.markdown(
+    """
+    <style>
+      .block-container { padding-top: 1.4rem; }
+      h1 { letter-spacing: -0.03em; }
+      .insight-box {
+        background: #F4F7F8;
+        border-left: 4px solid #0E7C7B;
+        padding: 0.85rem 1rem;
+        border-radius: 0 10px 10px 0;
+        margin: 0.35rem 0;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+with st.sidebar:
+    st.markdown("### How this works")
+    st.markdown(
+        """
+        1. Upload `.xlsx`, `.xls`, or `.csv`
+        2. Pick a sheet if the file has several
+        3. Read the **Key Insights** first — that is the analyst view
+        4. Generate Excel + PDF when you want a shareable briefing
+        """
+    )
+    st.divider()
+    st.markdown(
+        "🧹 **Data looking messy?** Clean it first with the "
+        f"[Data Cleaning Tool]({DATA_CLEANING_TOOL_URL})."
+    )
 
 st.title("Excel Report Automator")
 st.markdown(
@@ -57,17 +97,22 @@ def load_uploaded_file(uploaded_file) -> tuple[pd.DataFrame | None, str | None]:
 
 def render_insights(insights: list[str]) -> None:
     st.markdown("## 📌 Key Insights")
+    st.caption("What a report analyst would flag before building slides.")
     if not insights:
         st.success("No notable issues detected — this dataset looks clean.")
         return
     for i, sentence in enumerate(insights, start=1):
-        st.markdown(f"{i}. {sentence}")
+        st.markdown(
+            f'<div class="insight-box"><strong>{i}.</strong> {escape(sentence)}</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def render_profiling(df: pd.DataFrame) -> None:
     overview = dataset_overview(df)
     types = overview["types"]
     st.markdown("## Dataset profile")
+    st.caption("Shape, quality, and column-level stats for the selected sheet.")
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Rows", f"{overview['rows']:,}")
@@ -128,14 +173,43 @@ def render_profiling(df: pd.DataFrame) -> None:
         st.dataframe(pd.DataFrame(type_rows), use_container_width=True, hide_index=True)
 
 
+def render_downloads() -> None:
+    excel_bytes = st.session_state.get("excel_report")
+    pdf_bytes = st.session_state.get("pdf_report")
+    if not excel_bytes or not pdf_bytes:
+        return
+    stem = st.session_state.get("report_stem", "report")
+    d1, d2 = st.columns(2)
+    with d1:
+        st.download_button(
+            "Download Excel report",
+            data=excel_bytes,
+            file_name=f"{stem}_report.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    with d2:
+        st.download_button(
+            "Download PDF report",
+            data=pdf_bytes,
+            file_name=f"{stem}_report.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+
+
+st.markdown("## 1. Upload your file")
+st.caption("Accepted formats: Excel (.xlsx, .xls) and CSV. For workbooks, choose the sheet to analyze.")
+
 uploaded = st.file_uploader(
     "Upload an Excel or CSV file",
     type=["xlsx", "xls", "csv"],
     help="Accepted formats: .xlsx, .xls, .csv",
+    label_visibility="collapsed",
 )
 
 if uploaded is None:
-    st.info("Start by uploading a spreadsheet. You'll see a preview of the first 100 rows.")
+    st.info("Start by uploading a spreadsheet. You'll see insights, a profile, charts, and a report you can download.")
 else:
     df, error = load_uploaded_file(uploaded)
     if error:
@@ -159,7 +233,8 @@ else:
                 f"Report ready — Excel {len(excel_bytes) / 1024:.1f} KB, "
                 f"PDF {len(pdf_bytes) / 1024:.1f} KB."
             )
+        render_downloads()
 
-        st.subheader("Preview")
-        st.caption(f"Showing the first {min(100, len(df)):,} of {len(df):,} rows.")
+        st.markdown("## Data preview")
+        st.caption(f"Showing the first {min(100, len(df)):,} of {len(df):,} rows so you can sanity-check the import.")
         st.dataframe(df.head(100), use_container_width=True)
