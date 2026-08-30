@@ -8,6 +8,7 @@ import streamlit as st
 from insights import generate_insights
 from profiling import categorical_profile, dataset_overview, numeric_profile
 from charts import render_charts
+from reports import build_reports
 
 st.set_page_config(page_title="Excel Report Automator", layout="wide")
 
@@ -145,6 +146,20 @@ else:
         render_insights(generate_insights(df))
         render_profiling(df)
         render_charts(df)
+
+        st.markdown("## Generate report")
+        st.caption("Creates a formatted Excel workbook and a PDF briefing from the current sheet.")
+        if st.button("Generate Report", type="primary"):
+            with st.spinner("Writing Excel and PDF reports…"):
+                excel_bytes, pdf_bytes = build_reports(df, uploaded.name)
+            st.session_state["excel_report"] = excel_bytes
+            st.session_state["pdf_report"] = pdf_bytes
+            st.session_state["report_stem"] = uploaded.name.rsplit(".", 1)[0]
+            st.success(
+                f"Report ready — Excel {len(excel_bytes) / 1024:.1f} KB, "
+                f"PDF {len(pdf_bytes) / 1024:.1f} KB."
+            )
+
         st.subheader("Preview")
         st.caption(f"Showing the first {min(100, len(df)):,} of {len(df):,} rows.")
         st.dataframe(df.head(100), use_container_width=True)
