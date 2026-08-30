@@ -1,0 +1,15 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.env.*
+*.xlsx
+*.xls
+*.csv
+!sample*.csv
+.streamlit/secrets.toml
+.pytest_cache/
+.idea/
+.vscode/
