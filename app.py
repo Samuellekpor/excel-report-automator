@@ -7,6 +7,7 @@ import streamlit as st
 
 from insights import generate_insights
 from profiling import categorical_profile, dataset_overview, numeric_profile
+from charts import render_charts
 
 st.set_page_config(page_title="Excel Report Automator", layout="wide")
 
@@ -143,6 +144,7 @@ else:
     else:
         render_insights(generate_insights(df))
         render_profiling(df)
+        render_charts(df)
         st.subheader("Preview")
         st.caption(f"Showing the first {min(100, len(df)):,} of {len(df):,} rows.")
         st.dataframe(df.head(100), use_container_width=True)
