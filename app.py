@@ -5,6 +5,8 @@ from io import BytesIO
 import pandas as pd
 import streamlit as st
 
+from insights import generate_insights
+
 st.set_page_config(page_title="Excel Report Automator", layout="wide")
 
 st.title("Excel Report Automator")
@@ -50,6 +52,15 @@ def load_uploaded_file(uploaded_file) -> tuple[pd.DataFrame | None, str | None]:
         return None, f"Could not read this file. {exc}"
 
 
+def render_insights(insights: list[str]) -> None:
+    st.markdown("## 📌 Key Insights")
+    if not insights:
+        st.success("No notable issues detected — this dataset looks clean.")
+        return
+    for i, sentence in enumerate(insights, start=1):
+        st.markdown(f"{i}. {sentence}")
+
+
 uploaded = st.file_uploader(
     "Upload an Excel or CSV file",
     type=["xlsx", "xls", "csv"],
@@ -65,6 +76,7 @@ else:
     elif df is None or df.empty:
         st.error("This file is empty — there are no rows to analyze.")
     else:
+        render_insights(generate_insights(df))
         st.subheader("Preview")
         st.caption(f"Showing the first {min(100, len(df)):,} of {len(df):,} rows.")
         st.dataframe(df.head(100), use_container_width=True)
