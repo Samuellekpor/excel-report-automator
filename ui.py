@@ -90,8 +90,34 @@ CSS = r"""
     color: var(--era-ink) !important;
   }
 
-  p, label, span, li, .stMarkdown, [data-testid="stCaption"] {
+  p, label, li, .stMarkdown, [data-testid="stCaption"] {
     font-family: "Plus Jakarta Sans", sans-serif !important;
+  }
+
+  [data-testid="stBaseButton-headerNoPadding"],
+  [data-testid="stBaseButton-header"] {
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    font-size: 1.25rem !important;
+    padding: 0.35rem !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .material-icons,
+  .material-symbols-outlined,
+  .material-symbols-rounded,
+  .material-symbols-sharp,
+  [data-testid="stIconMaterial"],
+  [data-testid="stBaseButton-headerNoPadding"] span,
+  [data-testid="stSidebarCollapsedControl"] span,
+  [data-testid="collapsedControl"] span {
+    font-family: "Material Symbols Rounded", "Material Symbols Outlined" !important;
+    font-weight: 300 !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24;
   }
 
   [data-testid="stCaption"] {
@@ -139,7 +165,9 @@ CSS = r"""
     transform: scale(0.995);
   }
 
-  [data-testid="stFileUploaderDropzone"] * {
+  [data-testid="stFileUploaderDropzone"] p,
+  [data-testid="stFileUploaderDropzone"] small,
+  [data-testid="stFileUploaderDropzone"] button {
     color: var(--era-muted) !important;
     font-family: "Plus Jakarta Sans", sans-serif !important;
   }
