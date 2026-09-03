@@ -8,14 +8,29 @@ import streamlit as st
 from insights import classify_columns, coerce_datetime
 from ui import section_header
 
+# Names match the Google Fonts <link> in inject_theme() (ui.py). Fallbacks
+# keep Plotly readable if a family does not load inside the chart surface.
+_CHART_SANS = "Plus Jakarta Sans, ui-sans-serif, system-ui, sans-serif"
+_CHART_DISPLAY = "Syne, Plus Jakarta Sans, ui-sans-serif, system-ui, sans-serif"
+
 CHART_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="#0A0A0C",
-    font=dict(family="Plus Jakarta Sans, sans-serif", color="#F3F1EC", size=12),
-    title=dict(font=dict(family="Syne, sans-serif", size=16, color="#F3F1EC")),
+    font=dict(family=_CHART_SANS, color="#F3F1EC", size=12),
+    title=dict(font=dict(family=_CHART_DISPLAY, size=16, color="#F3F1EC")),
     margin=dict(l=40, r=24, t=56, b=40),
     colorway=["#5EEAD4", "#C4B5FD", "#F3F1EC", "#67E8F9"],
 )
+
+# Diverging like RdBu, reskinned: teal (negative) ↔ cream (zero) ↔ purple
+# (positive). Cream sits above the plot background so |r|≈0 still reads.
+CORR_COLORSCALE = [
+    [0.0, "#0F766E"],
+    [0.25, "#5EEAD4"],
+    [0.5, "#F3F1EC"],
+    [0.75, "#C4B5FD"],
+    [1.0, "#6D28D9"],
+]
 
 
 def _style(fig, **layout) -> None:
@@ -68,7 +83,7 @@ def render_charts(df: pd.DataFrame) -> None:
                 z=corr.values,
                 x=list(corr.columns),
                 y=list(corr.index),
-                colorscale=[[0, "#5EEAD4"], [0.5, "#0A0A0C"], [1, "#C4B5FD"]],
+                colorscale=CORR_COLORSCALE,
                 zmid=0,
                 zmin=-1,
                 zmax=1,

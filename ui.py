@@ -6,6 +6,7 @@ import streamlit as st
 
 DATA_CLEANING_TOOL_URL = "https://example.com/data-cleaning-tool"
 
+# Families must stay in sync with charts.CHART_LAYOUT / _CHART_DISPLAY.
 FONTS = """
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

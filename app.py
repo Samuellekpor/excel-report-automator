@@ -21,6 +21,7 @@ from ui import (
 st.set_page_config(
     page_title="Excel Report Automator",
     layout="wide",
+    # Open on desktop; collapse on narrow viewports so Protocol does not cover the hero.
     initial_sidebar_state="auto",
 )
 
