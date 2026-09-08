@@ -31,6 +31,9 @@ SKEW_STD_RATIO = 0.50
 TREND_MIN_POINTS = 6
 TREND_MIN_ABS_PCT_PER_MONTH = 2.0
 BRIEFING_LIMIT = 7
+SEGMENT_MIN_RATIO = 1.5
+SEGMENT_MAX_GROUPS = 12
+SEGMENT_MIN_PER_GROUP = 2
 MONEY_NAME_RE = re.compile(
     r"(amount|price|revenue|sales|cost|fee|salary|income|spend|budget|profit)",
     re.I,
@@ -145,6 +148,7 @@ def generate_findings(df: pd.DataFrame) -> list[Finding]:
     findings.extend(_correlation_insights(df, types["numeric"]))
     findings.extend(_trend_insights(df, types["datetime"], types["numeric"]))
     findings.extend(_skew_insights(df, types["numeric"]))
+    findings.extend(_segment_insights(df, types["categorical"], types["numeric"]))
     findings.extend(_unique_id_insights(types["identifiers"]))
     return findings
 
@@ -343,7 +347,65 @@ def _skew_insights(df: pd.DataFrame, numeric_cols: list[str]) -> list[Finding]:
     return out
 
 
-def _unique_id_insights(identifier_cols: list[str]) -> list[Finding]:
+def _hero_numeric(numeric_cols: list[str]) -> str | None:
+    if not numeric_cols:
+        return None
+    money = [col for col in numeric_cols if MONEY_NAME_RE.search(str(col))]
+    preferred = ("revenue", "sales", "amount")
+    for needle in preferred:
+        for col in money:
+            if needle in str(col).lower():
+                return col
+    if money:
+        return money[0]
+    return numeric_cols[0]
+
+
+def _segment_insights(
+    df: pd.DataFrame, categorical_cols: list[str], numeric_cols: list[str]
+) -> list[Finding]:
+    hero = _hero_numeric(numeric_cols)
+    if not hero or not categorical_cols:
+        return []
+    values = pd.to_numeric(df[hero], errors="coerce")
+    candidates: list[Finding] = []
+    for cat in categorical_cols:
+        frame = pd.DataFrame({"group": df[cat].astype(str), "value": values}).dropna()
+        counts = frame["group"].value_counts()
+        keep = counts[counts >= SEGMENT_MIN_PER_GROUP].index
+        means = frame[frame["group"].isin(keep)].groupby("group")["value"].mean()
+        if len(means) < 2 or len(means) > SEGMENT_MAX_GROUPS:
+            continue
+        top_name = str(means.idxmax())
+        bot_name = str(means.idxmin())
+        if top_name == bot_name:
+            continue
+        top_val = float(means.max())
+        bot_val = float(means.min())
+        if bot_val == 0:
+            if top_val <= 0:
+                continue
+            sentence = (
+                f"'{top_name}' leads '{cat}' on '{hero}' "
+                f"({_format_money_or_number(hero, top_val)} avg) versus '{bot_name}' near zero."
+            )
+            ratio = 3.0
+        else:
+            ratio = top_val / bot_val
+            if ratio < SEGMENT_MIN_RATIO:
+                continue
+            sentence = f"'{top_name}' is {ratio:.1f}× '{bot_name}' on '{hero}'."
+        candidates.append(
+            _finding(
+                "explain",
+                sentence,
+                "The mix is doing more work than the overall average suggests — slice before you conclude.",
+                58 + min(ratio * 4, 24),
+                "segment",
+            )
+        )
+    candidates.sort(key=lambda item: -item.score)
+    return candidates[:2]
     return [
         _finding(
             "ignore",
