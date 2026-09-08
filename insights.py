@@ -30,6 +30,7 @@ CORR_THRESHOLD = 0.70
 SKEW_STD_RATIO = 0.50
 TREND_MIN_POINTS = 6
 TREND_MIN_ABS_PCT_PER_MONTH = 2.0
+BRIEFING_LIMIT = 7
 MONEY_NAME_RE = re.compile(
     r"(amount|price|revenue|sales|cost|fee|salary|income|spend|budget|profit)",
     re.I,
@@ -149,7 +150,24 @@ def generate_findings(df: pd.DataFrame) -> list[Finding]:
 
 
 def generate_insights(df: pd.DataFrame) -> list[str]:
-    return [item.sentence for item in generate_findings(df)]
+    return [item.sentence for item in rank_findings(generate_findings(df))]
+
+
+def rank_findings(
+    findings: list[Finding], limit: int = BRIEFING_LIMIT
+) -> list[Finding]:
+    """Keep Watch/Explain, drop Ignore from the lead list, then take the top scores."""
+    story = [item for item in findings if item.lane != "ignore"]
+    ranked = sorted(story, key=lambda item: (-item.score, item.kind, item.sentence))
+    return ranked[:limit]
+
+
+def supporting_findings(
+    findings: list[Finding], briefing: list[Finding]
+) -> list[Finding]:
+    chosen = set(briefing)
+    rest = [item for item in findings if item not in chosen]
+    return sorted(rest, key=lambda item: (-item.score, item.sentence))
 
 
 def _missing_insights(df: pd.DataFrame, n_rows: int) -> list[Finding]:
