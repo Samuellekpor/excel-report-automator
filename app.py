@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from charts import render_charts
-from insights import generate_insights
+from insights import generate_findings, rank_findings, supporting_findings
 from profiling import categorical_profile, dataset_overview, numeric_profile
 from reports import build_reports
 from ui import (
@@ -64,13 +64,19 @@ def load_uploaded_file(uploaded_file) -> tuple[pd.DataFrame | None, str | None]:
         return None, f"Could not read this file. {exc}"
 
 
-def render_insights(insights: list[str]) -> None:
+def render_insights(df: pd.DataFrame) -> None:
+    all_findings = generate_findings(df)
+    briefing = rank_findings(all_findings)
+    extra = supporting_findings(all_findings, briefing)
     section_header(
         "01  ·  Briefing",
         "Key Insights",
-        "What a report analyst would flag before building slides.",
+        "Ranked like an analyst would: Watch what can distort the story, Explain what the data is doing, Ignore the rest.",
     )
-    insight_cards(insights)
+    insight_cards(briefing)
+    if extra:
+        with st.expander(f"Also noted ({len(extra)})"):
+            insight_cards(extra)
 
 
 def render_profiling(df: pd.DataFrame) -> None:
@@ -188,7 +194,7 @@ else:
     elif df is None or df.empty:
         st.error("This file is empty — there are no rows to analyze.")
     else:
-        render_insights(generate_insights(df))
+        render_insights(df)
         render_profiling(df)
         render_charts(df)
 
