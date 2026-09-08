@@ -406,6 +406,9 @@ def _segment_insights(
         )
     candidates.sort(key=lambda item: -item.score)
     return candidates[:2]
+
+
+def _unique_id_insights(identifier_cols: list[str]) -> list[Finding]:
     return [
         _finding(
             "ignore",
