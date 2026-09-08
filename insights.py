@@ -34,6 +34,7 @@ BRIEFING_LIMIT = 7
 SEGMENT_MIN_RATIO = 1.5
 SEGMENT_MAX_GROUPS = 12
 SEGMENT_MIN_PER_GROUP = 2
+PERIOD_MIN_ABS_PCT = 8.0
 MONEY_NAME_RE = re.compile(
     r"(amount|price|revenue|sales|cost|fee|salary|income|spend|budget|profit)",
     re.I,
@@ -149,6 +150,7 @@ def generate_findings(df: pd.DataFrame) -> list[Finding]:
     findings.extend(_trend_insights(df, types["datetime"], types["numeric"]))
     findings.extend(_skew_insights(df, types["numeric"]))
     findings.extend(_segment_insights(df, types["categorical"], types["numeric"]))
+    findings.extend(_period_insights(df, types["datetime"], types["numeric"]))
     findings.extend(_unique_id_insights(types["identifiers"]))
     return findings
 
@@ -406,6 +408,49 @@ def _segment_insights(
         )
     candidates.sort(key=lambda item: -item.score)
     return candidates[:2]
+
+
+def _period_insights(
+    df: pd.DataFrame, datetime_cols: list[str], numeric_cols: list[str]
+) -> list[Finding]:
+    if not datetime_cols:
+        return []
+    hero = _hero_numeric(numeric_cols)
+    if not hero:
+        return []
+    dates = coerce_datetime(df[datetime_cols[0]])
+    values = pd.to_numeric(df[hero], errors="coerce")
+    paired = pd.DataFrame({"date": dates, "value": values}).dropna().sort_values("date")
+    if paired["date"].nunique() < 6:
+        return []
+
+    span_days = (paired["date"].max() - paired["date"].min()).days
+    if span_days >= 60:
+        mid = paired["date"].min() + (paired["date"].max() - paired["date"].min()) / 2
+        first = paired.loc[paired["date"] < mid, "value"].mean()
+        second = paired.loc[paired["date"] >= mid, "value"].mean()
+        earlier, later = "the first half of the period", "the second half"
+    else:
+        cut = len(paired) // 2
+        first = paired["value"].iloc[:cut].mean()
+        second = paired["value"].iloc[cut:].mean()
+        earlier, later = "the earlier rows", "the later rows"
+
+    if pd.isna(first) or pd.isna(second) or first == 0:
+        return []
+    pct = (float(second) - float(first)) / abs(float(first)) * 100.0
+    if abs(pct) < PERIOD_MIN_ABS_PCT:
+        return []
+    direction = "up" if pct > 0 else "down"
+    return [
+        _finding(
+            "explain",
+            f"'{hero}' is {direction} {abs(pct):.0f}% in {later} versus {earlier}.",
+            "The period average hides a shift — compare the two windows before you lock a target.",
+            60 + min(abs(pct), 30),
+            "period",
+        )
+    ]
 
 
 def _unique_id_insights(identifier_cols: list[str]) -> list[Finding]:
