@@ -24,7 +24,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from insights import classify_columns, coerce_datetime, generate_insights
+from insights import Finding, classify_columns, coerce_datetime, generate_findings, rank_findings, supporting_findings
 from profiling import categorical_profile, dataset_overview, numeric_profile
 
 NAVY = "#1B3A4B"
@@ -34,16 +34,18 @@ LIGHT = "#F4F7F8"
 
 
 def build_reports(df: pd.DataFrame, source_name: str) -> tuple[bytes, bytes]:
-    insights = generate_insights(df)
+    all_findings = generate_findings(df)
+    briefing = rank_findings(all_findings)
+    extra = supporting_findings(all_findings, briefing)
     overview = dataset_overview(df)
     types = overview["types"]
     generated_at = datetime.now()
     chart_images = _chart_images(df, types)
     excel_bytes = _build_excel(
-        df, source_name, generated_at, insights, overview, types, chart_images
+        df, source_name, generated_at, briefing, extra, overview, types, chart_images
     )
     pdf_bytes = _build_pdf(
-        df, source_name, generated_at, insights, overview, types, chart_images
+        df, source_name, generated_at, briefing, extra, overview, types, chart_images
     )
     return excel_bytes, pdf_bytes
 
@@ -134,7 +136,8 @@ def _build_excel(
     df: pd.DataFrame,
     source_name: str,
     generated_at: datetime,
-    insights: list[str],
+    briefing: list[Finding],
+    extra: list[Finding],
     overview: dict[str, Any],
     types: dict[str, list[str]],
     chart_images: list[tuple[str, bytes]],
@@ -186,17 +189,31 @@ def _build_excel(
             summary.write(5 + i, 1, value, cell_fmt)
 
         start = 12
-        summary.write(start, 0, "Key Insights", header_fmt)
+        summary.write(start, 0, "Briefing", header_fmt)
         summary.write(start, 1, "", header_fmt)
-        if not insights:
+        summary.set_column("C:C", 72)
+        if not briefing:
             summary.write(start + 1, 0, "No notable issues detected — this dataset looks clean.", insight_fmt)
             summary.write(start + 1, 1, "", insight_fmt)
             summary.set_row(start + 1, 28)
+            row = start + 2
         else:
-            for i, sentence in enumerate(insights):
-                summary.write(start + 1 + i, 0, f"{i + 1}.", label_fmt)
-                summary.write(start + 1 + i, 1, sentence, insight_fmt)
-                summary.set_row(start + 1 + i, 28)
+            row = start + 1
+            for i, item in enumerate(briefing):
+                summary.write(row, 0, f"{i + 1}. {item.lane.upper()}", label_fmt)
+                summary.write(row, 1, f"{item.sentence}  {item.so_what}", insight_fmt)
+                summary.set_row(row, 36)
+                row += 1
+        if extra:
+            row += 1
+            summary.write(row, 0, "Also noted", header_fmt)
+            summary.write(row, 1, "", header_fmt)
+            row += 1
+            for item in extra:
+                summary.write(row, 0, item.lane.upper(), label_fmt)
+                summary.write(row, 1, f"{item.sentence}  {item.so_what}", insight_fmt)
+                summary.set_row(row, 32)
+                row += 1
 
         type_rows = []
         for kind, cols in types.items():
@@ -256,7 +273,8 @@ def _build_pdf(
     df: pd.DataFrame,
     source_name: str,
     generated_at: datetime,
-    insights: list[str],
+    briefing: list[Finding],
+    extra: list[Finding],
     overview: dict[str, Any],
     types: dict[str, list[str]],
     chart_images: list[tuple[str, bytes]],
@@ -316,15 +334,31 @@ def _build_pdf(
     story.append(Paragraph(generated_at.strftime("%B %d, %Y · %H:%M"), cover_sub))
     story.append(PageBreak())
 
+    so_what = ParagraphStyle(
+        "SoWhat",
+        parent=body,
+        textColor=colors.HexColor("#5C6568"),
+        fontSize=10,
+        leading=13,
+        spaceAfter=10,
+    )
+
     story.append(Paragraph("Key Insights", h1))
-    if not insights:
+    if not briefing:
         story.append(
             Paragraph("No notable issues detected — this dataset looks clean.", body)
         )
     else:
-        for i, sentence in enumerate(insights, start=1):
-            story.append(Paragraph(f"{i}. {sentence}", body))
-            story.append(Spacer(1, 6))
+        for i, item in enumerate(briefing, start=1):
+            story.append(
+                Paragraph(f"{i}. [{item.lane.upper()}] {item.sentence}", body)
+            )
+            story.append(Paragraph(item.so_what, so_what))
+    if extra:
+        story.append(Paragraph("Also noted", h1))
+        for item in extra:
+            story.append(Paragraph(f"[{item.lane.upper()}] {item.sentence}", body))
+            story.append(Paragraph(item.so_what, so_what))
 
     story.append(Paragraph("Dataset overview", h1))
     overview_table = Table(
