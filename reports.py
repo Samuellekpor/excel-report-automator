@@ -27,10 +27,23 @@ from reportlab.platypus import (
 from insights import Finding, classify_columns, coerce_datetime, generate_findings, rank_findings, supporting_findings
 from profiling import categorical_profile, dataset_overview, numeric_profile
 
-NAVY = "#1B3A4B"
-TEAL = "#0E7C7B"
-GOLD = "#C9A227"
-LIGHT = "#F4F7F8"
+INK = "#0A0A0C"
+CREAM = "#F3F1EC"
+TEAL = "#0F766E"
+TEAL_BRIGHT = "#5EEAD4"
+VIOLET = "#6D28D9"
+VIOLET_SOFT = "#C4B5FD"
+MUTED = "#5C6568"
+HAIR = "#D6D1C7"
+LIGHT = "#F3F1EC"
+
+CORR_CMAP = [
+    (0.0, "#0F766E"),
+    (0.25, "#5EEAD4"),
+    (0.5, "#F3F1EC"),
+    (0.75, "#C4B5FD"),
+    (1.0, "#6D28D9"),
+]
 
 
 def build_reports(df: pd.DataFrame, source_name: str) -> tuple[bytes, bytes]:
@@ -69,9 +82,11 @@ def _chart_images(df: pd.DataFrame, types: dict[str, list[str]]) -> list[tuple[s
             continue
         fig, ax = plt.subplots(figsize=(7.2, 3.6))
         ax.hist(series, bins=30, color=TEAL, edgecolor="white")
-        ax.set_title(f"Histogram — {col}", color=NAVY, loc="left")
+        ax.set_title(f"Histogram — {col}", color=INK, loc="left")
         ax.set_xlabel(col)
         ax.set_ylabel("Count")
+        ax.set_facecolor(CREAM)
+        fig.patch.set_facecolor(CREAM)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         images.append((f"hist_{col}", _fig_to_png(fig)))
@@ -82,9 +97,11 @@ def _chart_images(df: pd.DataFrame, types: dict[str, list[str]]) -> list[tuple[s
         if counts.empty:
             continue
         fig, ax = plt.subplots(figsize=(7.2, 3.6))
-        ax.bar(counts.index.astype(str), counts.values, color=NAVY)
-        ax.set_title(f"Top values — {col}", color=NAVY, loc="left")
+        ax.bar(counts.index.astype(str), counts.values, color=VIOLET)
+        ax.set_title(f"Top values — {col}", color=INK, loc="left")
         ax.tick_params(axis="x", rotation=35)
+        ax.set_facecolor(CREAM)
+        fig.patch.set_facecolor(CREAM)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         fig.tight_layout()
@@ -92,13 +109,18 @@ def _chart_images(df: pd.DataFrame, types: dict[str, list[str]]) -> list[tuple[s
 
     if len(types["numeric"]) >= 2:
         corr = df[types["numeric"]].apply(pd.to_numeric, errors="coerce").corr()
+        from matplotlib.colors import LinearSegmentedColormap
+
+        cmap = LinearSegmentedColormap.from_list("era", CORR_CMAP)
         fig, ax = plt.subplots(figsize=(6.5, 5.2))
-        im = ax.imshow(corr.values, cmap="coolwarm", vmin=-1, vmax=1)
+        fig.patch.set_facecolor(CREAM)
+        ax.set_facecolor(CREAM)
+        im = ax.imshow(corr.values, cmap=cmap, vmin=-1, vmax=1)
         ax.set_xticks(range(len(corr.columns)))
         ax.set_yticks(range(len(corr.index)))
         ax.set_xticklabels(corr.columns, rotation=45, ha="right")
         ax.set_yticklabels(corr.index)
-        ax.set_title("Correlation heatmap", color=NAVY, loc="left")
+        ax.set_title("Correlation heatmap", color=INK, loc="left")
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
         fig.tight_layout()
         images.append(("corr_heatmap", _fig_to_png(fig)))
@@ -114,8 +136,10 @@ def _chart_images(df: pd.DataFrame, types: dict[str, list[str]]) -> list[tuple[s
                 continue
             paired = paired.sort_values("date").groupby("date", as_index=False)["value"].mean()
             fig, ax = plt.subplots(figsize=(7.2, 3.6))
+            fig.patch.set_facecolor(CREAM)
+            ax.set_facecolor(CREAM)
             ax.plot(paired["date"], paired["value"], color=TEAL, linewidth=2)
-            ax.set_title(f"{num_col} over time", color=NAVY, loc="left")
+            ax.set_title(f"{num_col} over time", color=INK, loc="left")
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
             fig.autofmt_xdate()
@@ -126,7 +150,7 @@ def _chart_images(df: pd.DataFrame, types: dict[str, list[str]]) -> list[tuple[s
 
 def _fig_to_png(fig) -> bytes:
     buf = BytesIO()
-    fig.savefig(buf, format="png", dpi=140, bbox_inches="tight", facecolor="white")
+    fig.savefig(buf, format="png", dpi=140, bbox_inches="tight", facecolor=CREAM)
     plt.close(fig)
     buf.seek(0)
     return buf.read()
@@ -146,7 +170,7 @@ def _build_excel(
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         workbook = writer.book
         title_fmt = workbook.add_format(
-            {"bold": True, "font_size": 18, "font_color": NAVY, "font_name": "Calibri"}
+            {"bold": True, "font_size": 18, "font_color": INK, "font_name": "Calibri"}
         )
         subtitle_fmt = workbook.add_format(
             {"font_size": 11, "font_color": TEAL, "font_name": "Calibri"}
@@ -154,17 +178,17 @@ def _build_excel(
         header_fmt = workbook.add_format(
             {
                 "bold": True,
-                "bg_color": NAVY,
-                "font_color": "white",
+                "bg_color": INK,
+                "font_color": CREAM,
                 "border": 0,
                 "font_name": "Calibri",
             }
         )
-        label_fmt = workbook.add_format({"bold": True, "font_name": "Calibri", "font_color": NAVY})
-        cell_fmt = workbook.add_format({"font_name": "Calibri"})
+        label_fmt = workbook.add_format({"bold": True, "font_name": "Calibri", "font_color": INK})
+        cell_fmt = workbook.add_format({"font_name": "Calibri", "font_color": MUTED})
         wrap_fmt = workbook.add_format({"font_name": "Calibri", "text_wrap": True, "valign": "top"})
         insight_fmt = workbook.add_format(
-            {"font_name": "Calibri", "text_wrap": True, "bg_color": LIGHT, "valign": "top"}
+            {"font_name": "Calibri", "text_wrap": True, "bg_color": CREAM, "valign": "top"}
         )
 
         summary = workbook.add_worksheet("Summary")
@@ -295,7 +319,7 @@ def _build_pdf(
         parent=styles["Title"],
         fontName="Times-Bold",
         fontSize=26,
-        textColor=colors.HexColor(NAVY),
+        textColor=colors.HexColor(INK),
         alignment=TA_CENTER,
         spaceAfter=16,
     )
@@ -312,7 +336,7 @@ def _build_pdf(
         "H1Custom",
         parent=styles["Heading1"],
         fontName="Times-Bold",
-        textColor=colors.HexColor(NAVY),
+        textColor=colors.HexColor(INK),
         fontSize=16,
         spaceBefore=12,
         spaceAfter=8,
@@ -441,13 +465,13 @@ def _n(value: Any) -> str:
 def _table_style() -> TableStyle:
     return TableStyle(
         [
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(NAVY)),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(INK)),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor(CREAM)),
             ("FONTNAME", (0, 0), (-1, 0), "Times-Bold"),
             ("FONTNAME", (0, 1), (-1, -1), "Times-Roman"),
             ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor(LIGHT)),
-            ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#D0D7DA")),
+            ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor(CREAM)),
+            ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor(HAIR)),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("LEFTPADDING", (0, 0), (-1, -1), 6),
             ("RIGHTPADDING", (0, 0), (-1, -1), 6),
