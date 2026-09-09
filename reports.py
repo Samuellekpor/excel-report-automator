@@ -53,14 +53,51 @@ def build_reports(df: pd.DataFrame, source_name: str) -> tuple[bytes, bytes]:
     overview = dataset_overview(df)
     types = overview["types"]
     generated_at = datetime.now()
+    context = report_context(df, source_name, generated_at, overview, types)
     chart_images = _chart_images(df, types)
     excel_bytes = _build_excel(
-        df, source_name, generated_at, briefing, extra, overview, types, chart_images
+        df, context, briefing, extra, overview, types, chart_images
     )
     pdf_bytes = _build_pdf(
-        df, source_name, generated_at, briefing, extra, overview, types, chart_images
+        df, context, briefing, extra, overview, types, chart_images
     )
     return excel_bytes, pdf_bytes
+
+
+def report_context(
+    df: pd.DataFrame,
+    source_name: str,
+    generated_at: datetime,
+    overview: dict[str, Any],
+    types: dict[str, list[str]],
+) -> dict[str, Any]:
+    period = _period_label(df, types)
+    prepared = (
+        f"Prepared from {source_name} · {overview['rows']:,} rows"
+        f" · generated {generated_at.strftime('%d %b %Y, %H:%M')}"
+    )
+    if period:
+        prepared = f"{prepared} · {period}"
+    return {
+        "source_name": source_name,
+        "generated_at": generated_at,
+        "period": period,
+        "prepared": prepared,
+        "rows": overview["rows"],
+        "columns": overview["columns"],
+    }
+
+
+def _period_label(df: pd.DataFrame, types: dict[str, list[str]]) -> str | None:
+    if not types.get("datetime"):
+        return None
+    dates = coerce_datetime(df[types["datetime"][0]]).dropna()
+    if dates.empty:
+        return None
+    start, end = dates.min(), dates.max()
+    if pd.Timestamp(start).normalize() == pd.Timestamp(end).normalize():
+        return pd.Timestamp(start).strftime("%d %b %Y")
+    return f"{pd.Timestamp(start).strftime('%d %b %Y')} – {pd.Timestamp(end).strftime('%d %b %Y')}"
 
 
 def _excel_safe(df: pd.DataFrame) -> pd.DataFrame:
@@ -158,8 +195,7 @@ def _fig_to_png(fig) -> bytes:
 
 def _build_excel(
     df: pd.DataFrame,
-    source_name: str,
-    generated_at: datetime,
+    context: dict[str, Any],
     briefing: list[Finding],
     extra: list[Finding],
     overview: dict[str, Any],
@@ -195,9 +231,12 @@ def _build_excel(
         writer.sheets["Summary"] = summary
         summary.set_column("A:A", 28)
         summary.set_column("B:B", 88)
-        summary.write("A1", "Excel Report Automator", title_fmt)
-        summary.write("A2", f"Source: {source_name}", subtitle_fmt)
-        summary.write("A3", f"Generated: {generated_at.strftime('%Y-%m-%d %H:%M')}", subtitle_fmt)
+        summary.write("A1", "Analyst briefing", title_fmt)
+        summary.write("A2", context["prepared"], subtitle_fmt)
+        if context["period"]:
+            summary.write("A3", f"Period: {context['period']}", subtitle_fmt)
+        else:
+            summary.write("A3", f"Source: {context['source_name']}", subtitle_fmt)
 
         summary.write("A5", "Overview", header_fmt)
         summary.write("B5", "", header_fmt)
@@ -295,8 +334,7 @@ def _build_excel(
 
 def _build_pdf(
     df: pd.DataFrame,
-    source_name: str,
-    generated_at: datetime,
+    context: dict[str, Any],
     briefing: list[Finding],
     extra: list[Finding],
     overview: dict[str, Any],
@@ -311,7 +349,7 @@ def _build_pdf(
         rightMargin=0.7 * inch,
         topMargin=0.7 * inch,
         bottomMargin=0.7 * inch,
-        title=f"Excel Report Automator — {source_name}",
+        title=f"Analyst briefing — {context['source_name']}",
     )
     styles = getSampleStyleSheet()
     cover_title = ParagraphStyle(
@@ -352,10 +390,11 @@ def _build_pdf(
 
     story = []
     story.append(Spacer(1, 2.2 * inch))
-    story.append(Paragraph("Excel Report Automator", cover_title))
-    story.append(Paragraph("Analyst briefing", cover_sub))
-    story.append(Paragraph(source_name, cover_sub))
-    story.append(Paragraph(generated_at.strftime("%B %d, %Y · %H:%M"), cover_sub))
+    story.append(Paragraph("Analyst briefing", cover_title))
+    story.append(Paragraph(context["source_name"], cover_sub))
+    if context["period"]:
+        story.append(Paragraph(context["period"], cover_sub))
+    story.append(Paragraph(context["prepared"], cover_sub))
     story.append(PageBreak())
 
     so_what = ParagraphStyle(
