@@ -54,7 +54,9 @@ CORR_CMAP = [
 ]
 
 
-def build_reports(df: pd.DataFrame, source_name: str) -> tuple[bytes, bytes]:
+def build_reports(
+    df: pd.DataFrame, source_name: str, kind: str = "full"
+) -> tuple[bytes, bytes]:
     all_findings = generate_findings(df)
     briefing = rank_findings(all_findings)
     extra = supporting_findings(all_findings, briefing)
@@ -62,8 +64,12 @@ def build_reports(df: pd.DataFrame, source_name: str) -> tuple[bytes, bytes]:
     types = overview["types"]
     generated_at = datetime.now()
     context = report_context(df, source_name, generated_at, overview, types)
+    context["kind"] = kind
     chart_images = _chart_images(df, types)
     evidence_charts, appendix_charts = _partition_charts(chart_images, types)
+    if kind == "executive":
+        extra = []
+        appendix_charts = []
     excel_bytes = _build_excel(
         df, context, briefing, extra, overview, types, evidence_charts, appendix_charts
     )
@@ -308,34 +314,35 @@ def _build_excel(
                 summary.set_row(row, 32)
                 row += 1
 
-        type_rows = []
-        for kind, cols in types.items():
-            for col in cols:
-                type_rows.append({"Column": col, "Detected type": kind})
-        pd.DataFrame(type_rows).to_excel(writer, sheet_name="Column Types", index=False)
+        if context.get("kind") != "executive":
+            type_rows = []
+            for kind_name, cols in types.items():
+                for col in cols:
+                    type_rows.append({"Column": col, "Detected type": kind_name})
+            pd.DataFrame(type_rows).to_excel(writer, sheet_name="Column Types", index=False)
 
-        num_df = numeric_profile(df, types["numeric"]) if types["numeric"] else pd.DataFrame()
-        if not num_df.empty:
-            num_df.to_excel(writer, sheet_name="Numeric Stats", index=False)
+            num_df = numeric_profile(df, types["numeric"]) if types["numeric"] else pd.DataFrame()
+            if not num_df.empty:
+                num_df.to_excel(writer, sheet_name="Numeric Stats", index=False)
 
-        cat_rows = []
-        cat_cols = types["categorical"] + types["text"] + types["identifiers"]
-        for profile in categorical_profile(df, cat_cols):
-            top = "; ".join(
-                f"{row.Value} ({row.Count})" for row in profile["top_values"].itertuples()
-            )
-            cat_rows.append(
-                {
-                    "Column": profile["column"],
-                    "Unique": profile["unique_count"],
-                    "Missing": profile["missing"],
-                    "Top values": top,
-                }
-            )
-        if cat_rows:
-            pd.DataFrame(cat_rows).to_excel(writer, sheet_name="Category Stats", index=False)
+            cat_rows = []
+            cat_cols = types["categorical"] + types["text"] + types["identifiers"]
+            for profile in categorical_profile(df, cat_cols):
+                top = "; ".join(
+                    f"{row.Value} ({row.Count})" for row in profile["top_values"].itertuples()
+                )
+                cat_rows.append(
+                    {
+                        "Column": profile["column"],
+                        "Unique": profile["unique_count"],
+                        "Missing": profile["missing"],
+                        "Top values": top,
+                    }
+                )
+            if cat_rows:
+                pd.DataFrame(cat_rows).to_excel(writer, sheet_name="Category Stats", index=False)
 
-        _excel_safe(df).to_excel(writer, sheet_name="Data", index=False)
+            _excel_safe(df).to_excel(writer, sheet_name="Data", index=False)
 
         for sheet_name in writer.sheets:
             if sheet_name == "Summary":
@@ -434,6 +441,10 @@ def _build_pdf(
     story = []
     story.append(Spacer(1, 2.2 * inch))
     story.append(Paragraph("Analyst briefing", cover_title))
+    if context.get("kind") == "executive":
+        story.append(Paragraph("Executive · three pages", cover_sub))
+    else:
+        story.append(Paragraph("Full appendix", cover_sub))
     story.append(Paragraph(context["source_name"], cover_sub))
     if context["period"]:
         story.append(Paragraph(context["period"], cover_sub))
@@ -476,7 +487,7 @@ def _build_pdf(
     overview_table.setStyle(_table_style())
     story.append(overview_table)
 
-    if types["numeric"]:
+    if context.get("kind") != "executive" and types["numeric"]:
         story.append(Paragraph("Numeric statistics", h1))
         num_df = numeric_profile(df, types["numeric"])
         header = ["Column", "Count", "Mean", "Median", "Min", "Max", "Std", "Missing"]
@@ -498,26 +509,27 @@ def _build_pdf(
         table.setStyle(_table_style())
         story.append(table)
 
-    cat_cols = types["categorical"] + types["text"] + types["identifiers"]
-    if cat_cols:
-        story.append(Paragraph("Categorical and text columns", h1))
-        cat_header = ["Column", "Unique", "Missing", "Top values"]
-        cat_rows = [cat_header]
-        for profile in categorical_profile(df, cat_cols):
-            top = ", ".join(
-                f"{row.Value} ({row.Count})" for row in profile["top_values"].itertuples()
-            )
-            cat_rows.append(
-                [
-                    Paragraph(str(profile["column"]), body),
-                    str(profile["unique_count"]),
-                    str(profile["missing"]),
-                    Paragraph(top or "—", body),
-                ]
-            )
-        cat_table = Table(cat_rows, colWidths=[1.4 * inch, 0.8 * inch, 0.9 * inch, 3.5 * inch], repeatRows=1)
-        cat_table.setStyle(_table_style())
-        story.append(cat_table)
+    if context.get("kind") != "executive":
+        cat_cols = types["categorical"] + types["text"] + types["identifiers"]
+        if cat_cols:
+            story.append(Paragraph("Categorical and text columns", h1))
+            cat_header = ["Column", "Unique", "Missing", "Top values"]
+            cat_rows = [cat_header]
+            for profile in categorical_profile(df, cat_cols):
+                top = ", ".join(
+                    f"{row.Value} ({row.Count})" for row in profile["top_values"].itertuples()
+                )
+                cat_rows.append(
+                    [
+                        Paragraph(str(profile["column"]), body),
+                        str(profile["unique_count"]),
+                        str(profile["missing"]),
+                        Paragraph(top or "—", body),
+                    ]
+                )
+            cat_table = Table(cat_rows, colWidths=[1.4 * inch, 0.8 * inch, 0.9 * inch, 3.5 * inch], repeatRows=1)
+            cat_table.setStyle(_table_style())
+            story.append(cat_table)
 
     if evidence_charts:
         story.append(PageBreak())

@@ -153,12 +153,14 @@ def render_downloads() -> None:
     if not excel_bytes or not pdf_bytes:
         return
     stem = st.session_state.get("report_stem", "report")
+    kind = st.session_state.get("report_kind", "full")
+    suffix = "executive" if kind == "executive" else "full"
     d1, d2 = st.columns(2)
     with d1:
         st.download_button(
             "Download Excel  ↗",
             data=excel_bytes,
-            file_name=f"{stem}_report.xlsx",
+            file_name=f"{stem}_{suffix}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
@@ -166,7 +168,7 @@ def render_downloads() -> None:
         st.download_button(
             "Download PDF  ↗",
             data=pdf_bytes,
-            file_name=f"{stem}_report.pdf",
+            file_name=f"{stem}_{suffix}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
@@ -201,14 +203,23 @@ else:
         section_header(
             "04  ·  Deliverable",
             "Generate report",
-            "A formatted Excel workbook and a PDF briefing from the current sheet.",
+            "The file is the product. Executive is the three-page briefing; Full keeps the appendix.",
         )
+        kind_label = st.radio(
+            "Report length",
+            ["Executive (3 pages)", "Full appendix"],
+            horizontal=True,
+        )
+        report_kind = "executive" if kind_label.startswith("Executive") else "full"
         if st.button("Generate Report", type="primary"):
             with st.spinner("Writing Excel and PDF reports…"):
-                excel_bytes, pdf_bytes = build_reports(df, uploaded.name)
+                excel_bytes, pdf_bytes = build_reports(
+                    df, uploaded.name, kind=report_kind
+                )
             st.session_state["excel_report"] = excel_bytes
             st.session_state["pdf_report"] = pdf_bytes
             st.session_state["report_stem"] = uploaded.name.rsplit(".", 1)[0]
+            st.session_state["report_kind"] = report_kind
             st.success(
                 f"Report ready — Excel {len(excel_bytes) / 1024:.1f} KB, "
                 f"PDF {len(pdf_bytes) / 1024:.1f} KB."
