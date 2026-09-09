@@ -76,8 +76,6 @@ def report_context(
         f"Prepared from {source_name} · {overview['rows']:,} rows"
         f" · generated {generated_at.strftime('%d %b %Y, %H:%M')}"
     )
-    if period:
-        prepared = f"{prepared} · {period}"
     return {
         "source_name": source_name,
         "generated_at": generated_at,
@@ -238,8 +236,25 @@ def _build_excel(
         else:
             summary.write("A3", f"Source: {context['source_name']}", subtitle_fmt)
 
-        summary.write("A5", "Overview", header_fmt)
+        summary.write("A5", "Briefing", header_fmt)
         summary.write("B5", "", header_fmt)
+        if not briefing:
+            summary.write(6, 0, "No notable issues detected — this dataset looks clean.", insight_fmt)
+            summary.write(6, 1, "", insight_fmt)
+            summary.set_row(6, 28)
+            row = 8
+        else:
+            row = 6
+            for i, item in enumerate(briefing):
+                summary.write(row, 0, f"{i + 1}. {item.lane.upper()}", label_fmt)
+                summary.write(row, 1, f"{item.sentence}  {item.so_what}", insight_fmt)
+                summary.set_row(row, 36)
+                row += 1
+            row += 1
+
+        summary.write(row, 0, "Overview", header_fmt)
+        summary.write(row, 1, "", header_fmt)
+        row += 1
         metrics = [
             ("Rows", f"{overview['rows']:,}"),
             ("Columns", f"{overview['columns']:,}"),
@@ -247,26 +262,11 @@ def _build_excel(
             ("Missing cells", f"{overview['missing_cells']:,}"),
             ("Missing overall", f"{overview['missing_pct']:.1f}%"),
         ]
-        for i, (label, value) in enumerate(metrics):
-            summary.write(5 + i, 0, label, label_fmt)
-            summary.write(5 + i, 1, value, cell_fmt)
+        for label, value in metrics:
+            summary.write(row, 0, label, label_fmt)
+            summary.write(row, 1, value, cell_fmt)
+            row += 1
 
-        start = 12
-        summary.write(start, 0, "Briefing", header_fmt)
-        summary.write(start, 1, "", header_fmt)
-        summary.set_column("C:C", 72)
-        if not briefing:
-            summary.write(start + 1, 0, "No notable issues detected — this dataset looks clean.", insight_fmt)
-            summary.write(start + 1, 1, "", insight_fmt)
-            summary.set_row(start + 1, 28)
-            row = start + 2
-        else:
-            row = start + 1
-            for i, item in enumerate(briefing):
-                summary.write(row, 0, f"{i + 1}. {item.lane.upper()}", label_fmt)
-                summary.write(row, 1, f"{item.sentence}  {item.so_what}", insight_fmt)
-                summary.set_row(row, 36)
-                row += 1
         if extra:
             row += 1
             summary.write(row, 0, "Also noted", header_fmt)
@@ -406,7 +406,7 @@ def _build_pdf(
         spaceAfter=10,
     )
 
-    story.append(Paragraph("Key Insights", h1))
+    story.append(Paragraph("Briefing", h1))
     if not briefing:
         story.append(
             Paragraph("No notable issues detected — this dataset looks clean.", body)
@@ -417,13 +417,8 @@ def _build_pdf(
                 Paragraph(f"{i}. [{item.lane.upper()}] {item.sentence}", body)
             )
             story.append(Paragraph(item.so_what, so_what))
-    if extra:
-        story.append(Paragraph("Also noted", h1))
-        for item in extra:
-            story.append(Paragraph(f"[{item.lane.upper()}] {item.sentence}", body))
-            story.append(Paragraph(item.so_what, so_what))
 
-    story.append(Paragraph("Dataset overview", h1))
+    story.append(Paragraph("Evidence", h1))
     overview_table = Table(
         [
             ["Metric", "Value"],
@@ -490,6 +485,12 @@ def _build_pdf(
             img._restrictSize(6.8 * inch, 3.8 * inch)
             story.append(img)
             story.append(Spacer(1, 10))
+
+    if extra:
+        story.append(Paragraph("Appendix — also noted", h1))
+        for item in extra:
+            story.append(Paragraph(f"[{item.lane.upper()}] {item.sentence}", body))
+            story.append(Paragraph(item.so_what, so_what))
 
     doc.build(story)
     return buffer.getvalue()
