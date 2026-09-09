@@ -349,7 +349,7 @@ def _skew_insights(df: pd.DataFrame, numeric_cols: list[str]) -> list[Finding]:
     return out
 
 
-def _hero_numeric(numeric_cols: list[str]) -> str | None:
+def hero_numeric(numeric_cols: list[str]) -> str | None:
     if not numeric_cols:
         return None
     money = [col for col in numeric_cols if MONEY_NAME_RE.search(str(col))]
@@ -366,7 +366,7 @@ def _hero_numeric(numeric_cols: list[str]) -> str | None:
 def _segment_insights(
     df: pd.DataFrame, categorical_cols: list[str], numeric_cols: list[str]
 ) -> list[Finding]:
-    hero = _hero_numeric(numeric_cols)
+    hero = hero_numeric(numeric_cols)
     if not hero or not categorical_cols:
         return []
     values = pd.to_numeric(df[hero], errors="coerce")
@@ -415,7 +415,7 @@ def _period_insights(
 ) -> list[Finding]:
     if not datetime_cols:
         return []
-    hero = _hero_numeric(numeric_cols)
+    hero = hero_numeric(numeric_cols)
     if not hero:
         return []
     dates = coerce_datetime(df[datetime_cols[0]])

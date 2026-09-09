@@ -24,7 +24,15 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from insights import Finding, classify_columns, coerce_datetime, generate_findings, rank_findings, supporting_findings
+from insights import (
+    Finding,
+    classify_columns,
+    coerce_datetime,
+    generate_findings,
+    hero_numeric,
+    rank_findings,
+    supporting_findings,
+)
 from profiling import categorical_profile, dataset_overview, numeric_profile
 
 INK = "#0A0A0C"
@@ -55,11 +63,12 @@ def build_reports(df: pd.DataFrame, source_name: str) -> tuple[bytes, bytes]:
     generated_at = datetime.now()
     context = report_context(df, source_name, generated_at, overview, types)
     chart_images = _chart_images(df, types)
+    evidence_charts, appendix_charts = _partition_charts(chart_images, types)
     excel_bytes = _build_excel(
-        df, context, briefing, extra, overview, types, chart_images
+        df, context, briefing, extra, overview, types, evidence_charts, appendix_charts
     )
     pdf_bytes = _build_pdf(
-        df, context, briefing, extra, overview, types, chart_images
+        df, context, briefing, extra, overview, types, evidence_charts, appendix_charts
     )
     return excel_bytes, pdf_bytes
 
@@ -183,6 +192,26 @@ def _chart_images(df: pd.DataFrame, types: dict[str, list[str]]) -> list[tuple[s
     return images
 
 
+def _partition_charts(
+    chart_images: list[tuple[str, bytes]], types: dict[str, list[str]]
+) -> tuple[list[tuple[str, bytes]], list[tuple[str, bytes]]]:
+    hero = hero_numeric(types.get("numeric") or [])
+    preferred: list[str] = []
+    if hero:
+        preferred.append(f"hist_{hero}")
+    cat = (types.get("categorical") or [None])[0]
+    if cat:
+        preferred.append(f"bar_{cat}")
+    preferred.append("corr_heatmap")
+    if hero:
+        preferred.append(f"ts_{hero}")
+    by_name = {name: blob for name, blob in chart_images}
+    evidence = [(name, by_name[name]) for name in preferred if name in by_name]
+    evidence_names = {name for name, _ in evidence}
+    appendix = [(name, blob) for name, blob in chart_images if name not in evidence_names]
+    return evidence, appendix
+
+
 def _fig_to_png(fig) -> bytes:
     buf = BytesIO()
     fig.savefig(buf, format="png", dpi=140, bbox_inches="tight", facecolor=CREAM)
@@ -198,7 +227,8 @@ def _build_excel(
     extra: list[Finding],
     overview: dict[str, Any],
     types: dict[str, list[str]],
-    chart_images: list[tuple[str, bytes]],
+    evidence_charts: list[tuple[str, bytes]],
+    appendix_charts: list[tuple[str, bytes]],
 ) -> bytes:
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
@@ -317,9 +347,9 @@ def _build_excel(
 
         charts_ws = workbook.add_worksheet("Charts")
         writer.sheets["Charts"] = charts_ws
-        charts_ws.write("A1", "Charts", title_fmt)
+        charts_ws.write("A1", "Evidence", title_fmt)
         row = 2
-        for name, png in chart_images:
+        for name, png in evidence_charts:
             charts_ws.write(row, 0, name.replace("_", " "), label_fmt)
             charts_ws.insert_image(
                 row + 1,
@@ -328,6 +358,18 @@ def _build_excel(
                 {"image_data": BytesIO(png), "x_scale": 0.9, "y_scale": 0.9},
             )
             row += 20
+        if appendix_charts:
+            charts_ws.write(row, 0, "Appendix", title_fmt)
+            row += 2
+            for name, png in appendix_charts:
+                charts_ws.write(row, 0, name.replace("_", " "), label_fmt)
+                charts_ws.insert_image(
+                    row + 1,
+                    0,
+                    f"{name}.png",
+                    {"image_data": BytesIO(png), "x_scale": 0.9, "y_scale": 0.9},
+                )
+                row += 20
 
     return output.getvalue()
 
@@ -339,7 +381,8 @@ def _build_pdf(
     extra: list[Finding],
     overview: dict[str, Any],
     types: dict[str, list[str]],
-    chart_images: list[tuple[str, bytes]],
+    evidence_charts: list[tuple[str, bytes]],
+    appendix_charts: list[tuple[str, bytes]],
 ) -> bytes:
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -476,10 +519,10 @@ def _build_pdf(
         cat_table.setStyle(_table_style())
         story.append(cat_table)
 
-    if chart_images:
+    if evidence_charts:
         story.append(PageBreak())
-        story.append(Paragraph("Charts", h1))
-        for name, png in chart_images:
+        story.append(Paragraph("Evidence — charts", h1))
+        for name, png in evidence_charts:
             story.append(Paragraph(name.replace("_", " "), body))
             img = Image(BytesIO(png))
             img._restrictSize(6.8 * inch, 3.8 * inch)
@@ -491,6 +534,16 @@ def _build_pdf(
         for item in extra:
             story.append(Paragraph(f"[{item.lane.upper()}] {item.sentence}", body))
             story.append(Paragraph(item.so_what, so_what))
+
+    if appendix_charts:
+        story.append(PageBreak())
+        story.append(Paragraph("Appendix — charts", h1))
+        for name, png in appendix_charts:
+            story.append(Paragraph(name.replace("_", " "), body))
+            img = Image(BytesIO(png))
+            img._restrictSize(6.8 * inch, 3.8 * inch)
+            story.append(img)
+            story.append(Spacer(1, 10))
 
     doc.build(story)
     return buffer.getvalue()
