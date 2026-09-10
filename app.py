@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -17,6 +18,9 @@ from ui import (
     section_header,
     sidebar_chrome,
 )
+
+SAMPLE_PATH = Path(__file__).with_name("sample_sales.csv")
+
 
 st.set_page_config(
     page_title="Excel Report Automator",
@@ -174,6 +178,43 @@ def render_downloads() -> None:
         )
 
 
+def render_workspace(df: pd.DataFrame, source_name: str) -> None:
+    render_insights(df)
+    render_profiling(df)
+    render_charts(df)
+
+    section_header(
+        "04  ·  Deliverable",
+        "Generate report",
+        "The file is the product. Executive is the three-page briefing; Full keeps the appendix.",
+    )
+    kind_label = st.radio(
+        "Report length",
+        ["Executive (3 pages)", "Full appendix"],
+        horizontal=True,
+    )
+    report_kind = "executive" if kind_label.startswith("Executive") else "full"
+    if st.button("Generate Report", type="primary"):
+        with st.spinner("Writing Excel and PDF reports…"):
+            excel_bytes, pdf_bytes = build_reports(df, source_name, kind=report_kind)
+        st.session_state["excel_report"] = excel_bytes
+        st.session_state["pdf_report"] = pdf_bytes
+        st.session_state["report_stem"] = source_name.rsplit(".", 1)[0]
+        st.session_state["report_kind"] = report_kind
+        st.success(
+            f"Report ready — Excel {len(excel_bytes) / 1024:.1f} KB, "
+            f"PDF {len(pdf_bytes) / 1024:.1f} KB."
+        )
+    render_downloads()
+
+    section_header(
+        "05  ·  Receipt",
+        "Data preview",
+        f"First {min(100, len(df)):,} of {len(df):,} rows — sanity-check the import.",
+    )
+    st.dataframe(df.head(100), use_container_width=True)
+
+
 section_header(
     "Drop the source",
     "Upload your file",
@@ -187,48 +228,22 @@ uploaded = st.file_uploader(
     label_visibility="collapsed",
 )
 
-if uploaded is None:
-    st.info("Start by uploading a spreadsheet. Insights, profile, charts, and the briefing files appear here.")
-else:
+if uploaded is not None:
+    st.session_state["use_sample"] = False
     df, error = load_uploaded_file(uploaded)
     if error:
         st.error(error)
     elif df is None or df.empty:
         st.error("This file is empty — there are no rows to analyze.")
     else:
-        render_insights(df)
-        render_profiling(df)
-        render_charts(df)
-
-        section_header(
-            "04  ·  Deliverable",
-            "Generate report",
-            "The file is the product. Executive is the three-page briefing; Full keeps the appendix.",
-        )
-        kind_label = st.radio(
-            "Report length",
-            ["Executive (3 pages)", "Full appendix"],
-            horizontal=True,
-        )
-        report_kind = "executive" if kind_label.startswith("Executive") else "full"
-        if st.button("Generate Report", type="primary"):
-            with st.spinner("Writing Excel and PDF reports…"):
-                excel_bytes, pdf_bytes = build_reports(
-                    df, uploaded.name, kind=report_kind
-                )
-            st.session_state["excel_report"] = excel_bytes
-            st.session_state["pdf_report"] = pdf_bytes
-            st.session_state["report_stem"] = uploaded.name.rsplit(".", 1)[0]
-            st.session_state["report_kind"] = report_kind
-            st.success(
-                f"Report ready — Excel {len(excel_bytes) / 1024:.1f} KB, "
-                f"PDF {len(pdf_bytes) / 1024:.1f} KB."
-            )
-        render_downloads()
-
-        section_header(
-            "05  ·  Receipt",
-            "Data preview",
-            f"First {min(100, len(df)):,} of {len(df):,} rows — sanity-check the import.",
-        )
-        st.dataframe(df.head(100), use_container_width=True)
+        render_workspace(df, uploaded.name)
+elif st.session_state.get("use_sample"):
+    render_workspace(pd.read_csv(SAMPLE_PATH), SAMPLE_PATH.name)
+    if st.button("Clear sample"):
+        st.session_state["use_sample"] = False
+        st.rerun()
+else:
+    st.info("Start by uploading a spreadsheet — or run the sample briefing to see the product in one click.")
+    if st.button("Try sample briefing", type="primary"):
+        st.session_state["use_sample"] = True
+        st.rerun()
