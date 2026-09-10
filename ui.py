@@ -6,7 +6,7 @@ from insights import Finding
 
 import streamlit as st
 
-DATA_CLEANING_TOOL_URL = "https://example.com/data-cleaning-tool"
+DATA_CLEANING_TOOL_URL = "https://compl-data-cleaning.streamlit.app/"
 
 # Families must stay in sync with charts.CHART_LAYOUT / _CHART_DISPLAY.
 FONTS = """
@@ -553,10 +553,10 @@ def sidebar_chrome() -> None:
         <div class="era-eyebrow">Protocol</div>
         <div class="era-side-title">How this works</div>
         <ol class="era-steps">
-          <li><b>01</b><span>Drop an .xlsx, .xls, or .csv</span></li>
-          <li><b>02</b><span>Choose a sheet if the file has several</span></li>
-          <li><b>03</b><span>Read Key Insights first — that is the briefing</span></li>
-          <li><b>04</b><span>Export Excel + PDF when you need a file to send</span></li>
+          <li><b>01</b><span>Clean messy data if you need to</span></li>
+          <li><b>02</b><span>Drop an .xlsx, .xls, or .csv</span></li>
+          <li><b>03</b><span>Read the briefing — Watch, then Explain</span></li>
+          <li><b>04</b><span>Send the Excel + PDF</span></li>
         </ol>
         <p class="era-note">Data looking messy? Clean it before you brief.</p>
         <a class="era-cta" href="{DATA_CLEANING_TOOL_URL}">
