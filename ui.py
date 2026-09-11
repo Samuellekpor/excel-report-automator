@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from html import escape
 
+from insights import Finding
+
 import streamlit as st
 
-DATA_CLEANING_TOOL_URL = "https://example.com/data-cleaning-tool"
+DATA_CLEANING_TOOL_URL = "https://compl-data-cleaning.streamlit.app/"
 
 # Families must stay in sync with charts.CHART_LAYOUT / _CHART_DISPLAY.
 FONTS = """
@@ -368,11 +370,47 @@ CSS = r"""
     margin: 0.65rem 0;
     animation: era-enter 900ms var(--era-ease) both;
   }
+
+  .era-insight {
+    display: grid;
     grid-template-columns: auto 1fr;
     gap: 0.9rem;
     align-items: start;
-    margin: 0.65rem 0;
-    animation: era-enter 900ms var(--era-ease) both;
+  }
+
+  .era-lane {
+    display: inline-flex;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    padding: 0.22rem 0.58rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .era-lane-watch {
+    color: #F5C16C;
+    border: 1px solid rgba(245, 193, 108, 0.35);
+    background: rgba(245, 193, 108, 0.08);
+  }
+
+  .era-lane-explain {
+    color: var(--era-violet);
+    border: 1px solid rgba(196, 181, 253, 0.35);
+    background: rgba(196, 181, 253, 0.08);
+  }
+
+  .era-lane-ignore {
+    color: var(--era-muted);
+    border: 1px solid var(--era-hair);
+  }
+
+  .era-so-what {
+    margin: 0.45rem 0 0;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: var(--era-muted);
   }
 
   .era-index {
@@ -515,10 +553,10 @@ def sidebar_chrome() -> None:
         <div class="era-eyebrow">Protocol</div>
         <div class="era-side-title">How this works</div>
         <ol class="era-steps">
-          <li><b>01</b><span>Drop an .xlsx, .xls, or .csv</span></li>
-          <li><b>02</b><span>Choose a sheet if the file has several</span></li>
-          <li><b>03</b><span>Read Key Insights first — that is the briefing</span></li>
-          <li><b>04</b><span>Export Excel + PDF when you need a file to send</span></li>
+          <li><b>01</b><span>Clean messy data if you need to</span></li>
+          <li><b>02</b><span>Drop an .xlsx, .xls, or .csv</span></li>
+          <li><b>03</b><span>Read the briefing — Watch, then Explain</span></li>
+          <li><b>04</b><span>Send the Excel + PDF</span></li>
         </ol>
         <p class="era-note">Data looking messy? Clean it before you brief.</p>
         <a class="era-cta" href="{DATA_CLEANING_TOOL_URL}">
@@ -556,8 +594,32 @@ def bento_metrics(rows: int, columns: int, duplicates: int, missing_pct: float) 
     st.markdown("".join(html), unsafe_allow_html=True)
 
 
-def insight_cards(insights: list[str]) -> None:
-    if not insights:
+def cleaning_nudge(findings: list[Finding]) -> None:
+    dirty = [item for item in findings if item.kind in {"missing", "duplicate"}]
+    if not dirty:
+        return
+    st.markdown(
+        f"""
+        <div class="era-shell" style="margin:0 0 1.1rem">
+          <div class="era-core">
+            <div class="era-kicker">Clean · then brief</div>
+            <p class="era-lede" style="margin:0 0 0.9rem">
+              Missing values or duplicate rows will distort the briefing.
+              Clean the sheet first, then upload it here.
+            </p>
+            <a class="era-cta" href="{DATA_CLEANING_TOOL_URL}" target="_blank" rel="noopener">
+              Open Data Cleaning Tool
+              <span class="era-cta-icon">↗</span>
+            </a>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def insight_cards(findings: list[Finding]) -> None:
+    if not findings:
         st.markdown(
             """
             <div class="era-shell">
@@ -571,14 +633,19 @@ def insight_cards(insights: list[str]) -> None:
         )
         return
     blocks = []
-    for i, sentence in enumerate(insights, start=1):
+    for i, item in enumerate(findings, start=1):
         delay = min(i * 80, 480)
+        lane = escape(item.lane)
         blocks.append(
             f"""
             <div class="era-shell era-insight-wrap" style="animation-delay:{delay}ms">
               <div class="era-core era-insight">
                 <div class="era-index">{i:02d}</div>
-                <p>{escape(sentence)}</p>
+                <div>
+                  <div class="era-lane era-lane-{lane}">{lane}</div>
+                  <p>{escape(item.sentence)}</p>
+                  <p class="era-so-what">{escape(item.so_what)}</p>
+                </div>
               </div>
             </div>
             """
