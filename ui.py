@@ -594,6 +594,30 @@ def bento_metrics(rows: int, columns: int, duplicates: int, missing_pct: float) 
     st.markdown("".join(html), unsafe_allow_html=True)
 
 
+def cleaning_nudge(findings: list[Finding]) -> None:
+    dirty = [item for item in findings if item.kind in {"missing", "duplicate"}]
+    if not dirty:
+        return
+    st.markdown(
+        f"""
+        <div class="era-shell" style="margin:0 0 1.1rem">
+          <div class="era-core">
+            <div class="era-kicker">Clean · then brief</div>
+            <p class="era-lede" style="margin:0 0 0.9rem">
+              Missing values or duplicate rows will distort the briefing.
+              Clean the sheet first, then upload it here.
+            </p>
+            <a class="era-cta" href="{DATA_CLEANING_TOOL_URL}" target="_blank" rel="noopener">
+              Open Data Cleaning Tool
+              <span class="era-cta-icon">↗</span>
+            </a>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def insight_cards(findings: list[Finding]) -> None:
     if not findings:
         st.markdown(

@@ -12,6 +12,7 @@ from profiling import categorical_profile, dataset_overview, numeric_profile
 from reports import build_reports
 from ui import (
     bento_metrics,
+    cleaning_nudge,
     hero,
     inject_theme,
     insight_cards,
@@ -77,6 +78,7 @@ def render_insights(df: pd.DataFrame) -> None:
         "Key Insights",
         "Ranked like an analyst would: Watch what can distort the story, Explain what the data is doing, Ignore the rest.",
     )
+    cleaning_nudge(all_findings)
     insight_cards(briefing)
     if extra:
         with st.expander(f"Also noted ({len(extra)})"):
