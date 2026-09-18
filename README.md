@@ -20,4 +20,4 @@ streamlit run app.py
 
 Then open the local URL Streamlit prints (usually http://localhost:8501), upload a spreadsheet, read the Key Insights section, and generate an Excel + PDF report when you want a file you can share.
 
-If the data looks messy, clean it first with a companion cleaner (the in-app sidebar links to a placeholder URL until that tool is published).
+If the data looks messy, clean it first with the [Data Cleaning Tool](https://compl-data-cleaning.streamlit.app/), then come back here to brief.

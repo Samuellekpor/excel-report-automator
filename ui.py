@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from html import escape
 
+from insights import Finding
+
 import streamlit as st
 
-DATA_CLEANING_TOOL_URL = "https://example.com/data-cleaning-tool"
+DATA_CLEANING_TOOL_URL = "https://compl-data-cleaning.streamlit.app/"
 
 # Families must stay in sync with charts.CHART_LAYOUT / _CHART_DISPLAY.
 FONTS = """
@@ -368,11 +370,47 @@ CSS = r"""
     margin: 0.65rem 0;
     animation: era-enter 900ms var(--era-ease) both;
   }
+
+  .era-insight {
+    display: grid;
     grid-template-columns: auto 1fr;
     gap: 0.9rem;
     align-items: start;
-    margin: 0.65rem 0;
-    animation: era-enter 900ms var(--era-ease) both;
+  }
+
+  .era-lane {
+    display: inline-flex;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    padding: 0.22rem 0.58rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .era-lane-watch {
+    color: #F5C16C;
+    border: 1px solid rgba(245, 193, 108, 0.35);
+    background: rgba(245, 193, 108, 0.08);
+  }
+
+  .era-lane-explain {
+    color: var(--era-violet);
+    border: 1px solid rgba(196, 181, 253, 0.35);
+    background: rgba(196, 181, 253, 0.08);
+  }
+
+  .era-lane-ignore {
+    color: var(--era-muted);
+    border: 1px solid var(--era-hair);
+  }
+
+  .era-so-what {
+    margin: 0.45rem 0 0;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: var(--era-muted);
   }
 
   .era-index {
@@ -490,18 +528,17 @@ def hero() -> None:
         """
         <div class="era-hero">
           <div>
-            <div class="era-eyebrow">Analyst briefing · no model API</div>
-            <h1>The spreadsheet,<br>spoken plainly.</h1>
+            <div class="era-eyebrow">From spreadsheet to briefing</div>
+            <h1>See what the data<br>is actually saying.</h1>
             <p class="era-lede">
-              Upload a workbook. We read the grain of the data and write the
-              findings a senior analyst would put on slide one — missingness,
-              outliers, drift, the relationships that actually matter.
+              Upload Excel or CSV. We scan the sheet and write a short briefing:
+              what to fix first, what the numbers are doing, and what you can ignore.
             </p>
           </div>
           <div class="era-hero-aside">
-            <strong>What you leave with.</strong><br>
-            A profile of every column, charts that follow the story,
-            and a shareable Excel + PDF briefing — generated in one pass.
+            <strong>What you get</strong><br>
+            A profile of every column, charts that match the story,
+            and an Excel + PDF you can send — all in one pass.
           </div>
         </div>
         """,
@@ -512,17 +549,17 @@ def hero() -> None:
 def sidebar_chrome() -> None:
     st.markdown(
         f"""
-        <div class="era-eyebrow">Protocol</div>
+        <div class="era-eyebrow">Steps</div>
         <div class="era-side-title">How this works</div>
         <ol class="era-steps">
-          <li><b>01</b><span>Drop an .xlsx, .xls, or .csv</span></li>
-          <li><b>02</b><span>Choose a sheet if the file has several</span></li>
-          <li><b>03</b><span>Read Key Insights first — that is the briefing</span></li>
-          <li><b>04</b><span>Export Excel + PDF when you need a file to send</span></li>
+          <li><b>01</b><span>Clean messy rows if you need to</span></li>
+          <li><b>02</b><span>Upload an Excel or CSV file</span></li>
+          <li><b>03</b><span>Read Watch items, then Explain</span></li>
+          <li><b>04</b><span>Download the Excel and PDF</span></li>
         </ol>
-        <p class="era-note">Data looking messy? Clean it before you brief.</p>
-        <a class="era-cta" href="{DATA_CLEANING_TOOL_URL}">
-          Data Cleaning Tool
+        <p class="era-note">Gaps and duplicate rows will skew the briefing. Clean first if the sheet looks messy.</p>
+        <a class="era-cta" href="{DATA_CLEANING_TOOL_URL}" target="_blank" rel="noopener">
+          Open the data cleaner
           <span class="era-cta-icon">↗</span>
         </a>
         """,
@@ -532,10 +569,10 @@ def sidebar_chrome() -> None:
 
 def bento_metrics(rows: int, columns: int, duplicates: int, missing_pct: float) -> None:
     specs = [
-        ("era-tile-lg", "Volume", f"{rows:,}", "Rows in the selected sheet"),
-        ("era-tile", "Structure", f"{columns:,}", "Columns detected"),
-        ("era-tile", "Copies", f"{duplicates:,}", "Duplicate rows"),
-        ("era-tile-lg", "Integrity", f"{missing_pct:.1f}%", "Cells empty across the whole grid"),
+        ("era-tile-lg", "Rows", f"{rows:,}", "How many records are in this sheet"),
+        ("era-tile", "Columns", f"{columns:,}", "Fields we detected"),
+        ("era-tile", "Duplicates", f"{duplicates:,}", "Exact copies of another row"),
+        ("era-tile-lg", "Empty cells", f"{missing_pct:.1f}%", "Share of the grid with no value"),
     ]
     html = ['<div class="era-bento">']
     for cls, kicker, value, hint in specs:
@@ -556,14 +593,38 @@ def bento_metrics(rows: int, columns: int, duplicates: int, missing_pct: float) 
     st.markdown("".join(html), unsafe_allow_html=True)
 
 
-def insight_cards(insights: list[str]) -> None:
-    if not insights:
+def cleaning_nudge(findings: list[Finding]) -> None:
+    dirty = [item for item in findings if item.kind in {"missing", "duplicate"}]
+    if not dirty:
+        return
+    st.markdown(
+        f"""
+        <div class="era-shell" style="margin:0 0 1.1rem">
+          <div class="era-core">
+            <div class="era-kicker">Clean this sheet first</div>
+            <p class="era-lede" style="margin:0 0 0.9rem">
+              Missing values or duplicate rows will throw the briefing off.
+              Clean the file, then upload it again.
+            </p>
+            <a class="era-cta" href="{DATA_CLEANING_TOOL_URL}" target="_blank" rel="noopener">
+              Open the data cleaner
+              <span class="era-cta-icon">↗</span>
+            </a>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def insight_cards(findings: list[Finding]) -> None:
+    if not findings:
         st.markdown(
             """
             <div class="era-shell">
               <div class="era-core">
-                <div class="era-kicker">Clean pass</div>
-                <p class="era-lede" style="margin:0">No notable issues detected — this dataset looks clean.</p>
+                <div class="era-kicker">Nothing stood out</div>
+                <p class="era-lede" style="margin:0">This sheet looks straightforward. Still check the profile and charts below.</p>
               </div>
             </div>
             """,
@@ -571,14 +632,19 @@ def insight_cards(insights: list[str]) -> None:
         )
         return
     blocks = []
-    for i, sentence in enumerate(insights, start=1):
+    for i, item in enumerate(findings, start=1):
         delay = min(i * 80, 480)
+        lane = escape(item.lane)
         blocks.append(
             f"""
             <div class="era-shell era-insight-wrap" style="animation-delay:{delay}ms">
               <div class="era-core era-insight">
                 <div class="era-index">{i:02d}</div>
-                <p>{escape(sentence)}</p>
+                <div>
+                  <div class="era-lane era-lane-{lane}">{lane.title()}</div>
+                  <p>{escape(item.sentence)}</p>
+                  <p class="era-so-what">{escape(item.so_what)}</p>
+                </div>
               </div>
             </div>
             """
