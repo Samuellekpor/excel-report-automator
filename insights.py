@@ -155,16 +155,23 @@ def generate_findings(df: pd.DataFrame) -> list[Finding]:
     return findings
 
 
+_LANE_RANK = {"watch": 0, "explain": 1, "ignore": 2}
+
+
 def generate_insights(df: pd.DataFrame) -> list[str]:
     return [item.sentence for item in rank_findings(generate_findings(df))]
+
+
+def _finding_sort_key(item: Finding) -> tuple:
+    return (_LANE_RANK.get(item.lane, 9), -item.score, item.kind, item.sentence)
 
 
 def rank_findings(
     findings: list[Finding], limit: int = BRIEFING_LIMIT
 ) -> list[Finding]:
-    """Keep Watch/Explain, drop Ignore from the lead list, then take the top scores."""
+    """Watch first, then Explain; Ignore stays out of the lead list."""
     story = [item for item in findings if item.lane != "ignore"]
-    ranked = sorted(story, key=lambda item: (-item.score, item.kind, item.sentence))
+    ranked = sorted(story, key=_finding_sort_key)
     return ranked[:limit]
 
 
@@ -173,7 +180,7 @@ def supporting_findings(
 ) -> list[Finding]:
     chosen = set(briefing)
     rest = [item for item in findings if item not in chosen]
-    return sorted(rest, key=lambda item: (-item.score, item.sentence))
+    return sorted(rest, key=_finding_sort_key)
 
 
 def _missing_insights(df: pd.DataFrame, n_rows: int) -> list[Finding]:
