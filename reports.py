@@ -275,14 +275,14 @@ def _build_excel(
         summary.write("A5", "Briefing", header_fmt)
         summary.write("B5", "", header_fmt)
         if not briefing:
-            summary.write(6, 0, "No notable issues detected — this dataset looks clean.", insight_fmt)
+            summary.write(6, 0, "Nothing stood out in this sheet.", insight_fmt)
             summary.write(6, 1, "", insight_fmt)
             summary.set_row(6, 28)
             row = 8
         else:
             row = 6
             for i, item in enumerate(briefing):
-                summary.write(row, 0, f"{i + 1}. {item.lane.upper()}", label_fmt)
+                summary.write(row, 0, f"{i + 1}. {item.lane.title()}", label_fmt)
                 summary.write(row, 1, f"{item.sentence}  {item.so_what}", insight_fmt)
                 summary.set_row(row, 36)
                 row += 1
@@ -296,7 +296,7 @@ def _build_excel(
             ("Columns", f"{overview['columns']:,}"),
             ("Duplicate rows", f"{overview['duplicate_rows']:,}"),
             ("Missing cells", f"{overview['missing_cells']:,}"),
-            ("Missing overall", f"{overview['missing_pct']:.1f}%"),
+            ("Empty cells", f"{overview['missing_pct']:.1f}%"),
         ]
         for label, value in metrics:
             summary.write(row, 0, label, label_fmt)
@@ -309,7 +309,7 @@ def _build_excel(
             summary.write(row, 1, "", header_fmt)
             row += 1
             for item in extra:
-                summary.write(row, 0, item.lane.upper(), label_fmt)
+                summary.write(row, 0, item.lane.title(), label_fmt)
                 summary.write(row, 1, f"{item.sentence}  {item.so_what}", insight_fmt)
                 summary.set_row(row, 32)
                 row += 1
@@ -354,7 +354,7 @@ def _build_excel(
 
         charts_ws = workbook.add_worksheet("Charts")
         writer.sheets["Charts"] = charts_ws
-        charts_ws.write("A1", "Evidence", title_fmt)
+        charts_ws.write("A1", "Charts", title_fmt)
         row = 2
         for name, png in evidence_charts:
             charts_ws.write(row, 0, name.replace("_", " "), label_fmt)
@@ -442,9 +442,9 @@ def _build_pdf(
     story.append(Spacer(1, 2.2 * inch))
     story.append(Paragraph("Analyst briefing", cover_title))
     if context.get("kind") == "executive":
-        story.append(Paragraph("Executive · three pages", cover_sub))
+        story.append(Paragraph("Short briefing · 3 pages", cover_sub))
     else:
-        story.append(Paragraph("Full appendix", cover_sub))
+        story.append(Paragraph("Full report", cover_sub))
     story.append(Paragraph(context["source_name"], cover_sub))
     if context["period"]:
         story.append(Paragraph(context["period"], cover_sub))
@@ -463,16 +463,16 @@ def _build_pdf(
     story.append(Paragraph("Briefing", h1))
     if not briefing:
         story.append(
-            Paragraph("No notable issues detected — this dataset looks clean.", body)
+            Paragraph("Nothing stood out in this sheet.", body)
         )
     else:
         for i, item in enumerate(briefing, start=1):
             story.append(
-                Paragraph(f"{i}. [{item.lane.upper()}] {item.sentence}", body)
+                Paragraph(f"{i}. [{item.lane.title()}] {item.sentence}", body)
             )
             story.append(Paragraph(item.so_what, so_what))
 
-    story.append(Paragraph("Evidence", h1))
+    story.append(Paragraph("Overview", h1))
     overview_table = Table(
         [
             ["Metric", "Value"],
@@ -480,7 +480,7 @@ def _build_pdf(
             ["Columns", f"{overview['columns']:,}"],
             ["Duplicate rows", f"{overview['duplicate_rows']:,}"],
             ["Missing cells", f"{overview['missing_cells']:,}"],
-            ["Missing overall", f"{overview['missing_pct']:.1f}%"],
+            ["Empty cells", f"{overview['missing_pct']:.1f}%"],
         ],
         colWidths=[2.4 * inch, 4.2 * inch],
     )
@@ -488,7 +488,7 @@ def _build_pdf(
     story.append(overview_table)
 
     if context.get("kind") != "executive" and types["numeric"]:
-        story.append(Paragraph("Numeric statistics", h1))
+        story.append(Paragraph("Number statistics", h1))
         num_df = numeric_profile(df, types["numeric"])
         header = ["Column", "Count", "Mean", "Median", "Min", "Max", "Std", "Missing"]
         rows = [header]
@@ -512,7 +512,7 @@ def _build_pdf(
     if context.get("kind") != "executive":
         cat_cols = types["categorical"] + types["text"] + types["identifiers"]
         if cat_cols:
-            story.append(Paragraph("Categorical and text columns", h1))
+            story.append(Paragraph("Categories and text", h1))
             cat_header = ["Column", "Unique", "Missing", "Top values"]
             cat_rows = [cat_header]
             for profile in categorical_profile(df, cat_cols):
@@ -533,7 +533,7 @@ def _build_pdf(
 
     if evidence_charts:
         story.append(PageBreak())
-        story.append(Paragraph("Evidence — charts", h1))
+        story.append(Paragraph("Charts", h1))
         for name, png in evidence_charts:
             story.append(Paragraph(name.replace("_", " "), body))
             img = Image(BytesIO(png))
@@ -544,7 +544,7 @@ def _build_pdf(
     if extra:
         story.append(Paragraph("Appendix — also noted", h1))
         for item in extra:
-            story.append(Paragraph(f"[{item.lane.upper()}] {item.sentence}", body))
+            story.append(Paragraph(f"[{item.lane.title()}] {item.sentence}", body))
             story.append(Paragraph(item.so_what, so_what))
 
     if appendix_charts:

@@ -26,7 +26,7 @@ SAMPLE_PATH = Path(__file__).with_name("sample_sales.csv")
 st.set_page_config(
     page_title="Excel Report Automator",
     layout="wide",
-    # Open on desktop; collapse on narrow viewports so Protocol does not cover the hero.
+    # Open on desktop; collapse on narrow viewports so the sidebar does not cover the hero.
     initial_sidebar_state="auto",
 )
 
@@ -60,13 +60,13 @@ def load_uploaded_file(uploaded_file) -> tuple[pd.DataFrame | None, str | None]:
             if not sheets:
                 return None, "This workbook has no sheets to read."
 
-            selected = st.selectbox("Select a sheet", sheets, index=0)
+            selected = st.selectbox("Which sheet should we use?", sheets, index=0)
             df = excel_file.parse(selected)
             return df, None
 
-        return None, f"Unsupported file type: .{suffix}"
+        return None, f"This file type is not supported: .{suffix}"
     except Exception as exc:
-        return None, f"Could not read this file. {exc}"
+        return None, f"We could not read this file. {exc}"
 
 
 def render_insights(df: pd.DataFrame) -> None:
@@ -75,13 +75,13 @@ def render_insights(df: pd.DataFrame) -> None:
     extra = supporting_findings(all_findings, briefing)
     section_header(
         "01  ·  Briefing",
-        "Key Insights",
-        "Ranked like an analyst would: Watch what can distort the story, Explain what the data is doing, Ignore the rest.",
+        "What matters",
+        "Watch first — those items can skew the rest. Then read Explain for the pattern. Ignore is noise.",
     )
     cleaning_nudge(all_findings)
     insight_cards(briefing)
     if extra:
-        with st.expander(f"Also noted ({len(extra)})"):
+        with st.expander(f"Also noted ({len(extra)}) — lower priority"):
             insight_cards(extra)
 
 
@@ -89,9 +89,9 @@ def render_profiling(df: pd.DataFrame) -> None:
     overview = dataset_overview(df)
     types = overview["types"]
     section_header(
-        "02  ·  Structure",
-        "Dataset profile",
-        "Shape, quality, and column-level stats for the selected sheet.",
+        "02  ·  Profile",
+        "What's in this sheet",
+        "Row counts, empty cells, and a look at each column.",
     )
     bento_metrics(
         overview["rows"],
@@ -101,7 +101,7 @@ def render_profiling(df: pd.DataFrame) -> None:
     )
 
     overview_tab, numeric_tab, category_tab, types_tab = st.tabs(
-        ["Overview", "Numeric", "Categorical / text", "Column types"]
+        ["Overview", "Numbers", "Categories & text", "Column types"]
     )
 
     with overview_tab:
@@ -111,7 +111,7 @@ def render_profiling(df: pd.DataFrame) -> None:
                 "Columns": overview["columns"],
                 "Duplicate rows": overview["duplicate_rows"],
                 "Missing cells": overview["missing_cells"],
-                "Missing overall": f"{overview['missing_pct']:.1f}%",
+                "Empty cells": f"{overview['missing_pct']:.1f}%",
             }
         )
 
@@ -131,17 +131,17 @@ def render_profiling(df: pd.DataFrame) -> None:
                 use_container_width=True,
             )
         else:
-            st.info("No numeric columns detected.")
+            st.info("No number columns in this sheet.")
 
     with category_tab:
         cat_cols = types["categorical"] + types["text"] + types["identifiers"]
         if not cat_cols:
-            st.info("No categorical or text columns detected.")
+            st.info("No category or text columns in this sheet.")
         else:
             for profile in categorical_profile(df, cat_cols):
                 st.markdown(f"**{profile['column']}**")
                 st.caption(
-                    f"{profile['unique_count']:,} unique values · {profile['missing']:,} missing"
+                    f"{profile['unique_count']:,} distinct values · {profile['missing']:,} empty"
                 )
                 st.dataframe(profile["top_values"], use_container_width=True, hide_index=True)
 
@@ -164,7 +164,7 @@ def render_downloads() -> None:
     d1, d2 = st.columns(2)
     with d1:
         st.download_button(
-            "Download Excel  ↗",
+            "Download Excel",
             data=excel_bytes,
             file_name=f"{stem}_{suffix}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -172,7 +172,7 @@ def render_downloads() -> None:
         )
     with d2:
         st.download_button(
-            "Download PDF  ↗",
+            "Download PDF",
             data=pdf_bytes,
             file_name=f"{stem}_{suffix}.pdf",
             mime="application/pdf",
@@ -186,41 +186,41 @@ def render_workspace(df: pd.DataFrame, source_name: str) -> None:
     render_charts(df)
 
     section_header(
-        "04  ·  Deliverable",
-        "Generate report",
-        "The file is the product. Executive is the three-page briefing; Full keeps the appendix.",
+        "04  ·  Report",
+        "Excel and PDF",
+        "Executive is a short three-page briefing. Full adds the extra charts.",
     )
     kind_label = st.radio(
-        "Report length",
-        ["Executive (3 pages)", "Full appendix"],
+        "How long should the report be?",
+        ["Executive (3 pages)", "Full report"],
         horizontal=True,
     )
     report_kind = "executive" if kind_label.startswith("Executive") else "full"
-    if st.button("Generate Report", type="primary"):
-        with st.spinner("Writing Excel and PDF reports…"):
+    if st.button("Generate report", type="primary"):
+        with st.spinner("Building Excel and PDF…"):
             excel_bytes, pdf_bytes = build_reports(df, source_name, kind=report_kind)
         st.session_state["excel_report"] = excel_bytes
         st.session_state["pdf_report"] = pdf_bytes
         st.session_state["report_stem"] = source_name.rsplit(".", 1)[0]
         st.session_state["report_kind"] = report_kind
         st.success(
-            f"Report ready — Excel {len(excel_bytes) / 1024:.1f} KB, "
+            f"Ready to download — Excel {len(excel_bytes) / 1024:.1f} KB, "
             f"PDF {len(pdf_bytes) / 1024:.1f} KB."
         )
     render_downloads()
 
     section_header(
-        "05  ·  Receipt",
-        "Data preview",
-        f"First {min(100, len(df)):,} of {len(df):,} rows — sanity-check the import.",
+        "05  ·  Preview",
+        "Check the import",
+        f"First {min(100, len(df)):,} of {len(df):,} rows — confirm we read the file correctly.",
     )
     st.dataframe(df.head(100), use_container_width=True)
 
 
 section_header(
-    "Drop the source",
-    "Upload your file",
-    "Excel (.xlsx, .xls) or CSV. For workbooks, choose the sheet to analyze.",
+    "Start here",
+    "Upload a file",
+    "Excel (.xlsx, .xls) or CSV. If the workbook has several sheets, pick one after you upload.",
 )
 
 uploaded = st.file_uploader(
@@ -241,11 +241,11 @@ if uploaded is not None:
         render_workspace(df, uploaded.name)
 elif st.session_state.get("use_sample"):
     render_workspace(pd.read_csv(SAMPLE_PATH), SAMPLE_PATH.name)
-    if st.button("Clear sample"):
+    if st.button("Back to upload"):
         st.session_state["use_sample"] = False
         st.rerun()
 else:
-    st.info("Start by uploading a spreadsheet — or run the sample briefing to see the product in one click.")
-    if st.button("Try sample briefing", type="primary"):
+    st.info("Upload a spreadsheet, or try the sample to see a briefing in one click.")
+    if st.button("Try with sample data", type="primary"):
         st.session_state["use_sample"] = True
         st.rerun()

@@ -528,18 +528,17 @@ def hero() -> None:
         """
         <div class="era-hero">
           <div>
-            <div class="era-eyebrow">Analyst briefing · no model API</div>
-            <h1>The spreadsheet,<br>spoken plainly.</h1>
+            <div class="era-eyebrow">From spreadsheet to briefing</div>
+            <h1>See what the data<br>is actually saying.</h1>
             <p class="era-lede">
-              Upload a workbook. We read the grain of the data and write the
-              findings a senior analyst would put on slide one — missingness,
-              outliers, drift, the relationships that actually matter.
+              Upload Excel or CSV. We scan the sheet and write a short briefing:
+              what to fix first, what the numbers are doing, and what you can ignore.
             </p>
           </div>
           <div class="era-hero-aside">
-            <strong>What you leave with.</strong><br>
-            A profile of every column, charts that follow the story,
-            and a shareable Excel + PDF briefing — generated in one pass.
+            <strong>What you get</strong><br>
+            A profile of every column, charts that match the story,
+            and an Excel + PDF you can send — all in one pass.
           </div>
         </div>
         """,
@@ -550,17 +549,17 @@ def hero() -> None:
 def sidebar_chrome() -> None:
     st.markdown(
         f"""
-        <div class="era-eyebrow">Protocol</div>
+        <div class="era-eyebrow">Steps</div>
         <div class="era-side-title">How this works</div>
         <ol class="era-steps">
-          <li><b>01</b><span>Clean messy data if you need to</span></li>
-          <li><b>02</b><span>Drop an .xlsx, .xls, or .csv</span></li>
-          <li><b>03</b><span>Read the briefing — Watch, then Explain</span></li>
-          <li><b>04</b><span>Send the Excel + PDF</span></li>
+          <li><b>01</b><span>Clean messy rows if you need to</span></li>
+          <li><b>02</b><span>Upload an Excel or CSV file</span></li>
+          <li><b>03</b><span>Read Watch items, then Explain</span></li>
+          <li><b>04</b><span>Download the Excel and PDF</span></li>
         </ol>
-        <p class="era-note">Data looking messy? Clean it before you brief.</p>
+        <p class="era-note">Gaps and duplicate rows will skew the briefing. Clean first if the sheet looks messy.</p>
         <a class="era-cta" href="{DATA_CLEANING_TOOL_URL}">
-          Data Cleaning Tool
+          Open the data cleaner
           <span class="era-cta-icon">↗</span>
         </a>
         """,
@@ -570,10 +569,10 @@ def sidebar_chrome() -> None:
 
 def bento_metrics(rows: int, columns: int, duplicates: int, missing_pct: float) -> None:
     specs = [
-        ("era-tile-lg", "Volume", f"{rows:,}", "Rows in the selected sheet"),
-        ("era-tile", "Structure", f"{columns:,}", "Columns detected"),
-        ("era-tile", "Copies", f"{duplicates:,}", "Duplicate rows"),
-        ("era-tile-lg", "Integrity", f"{missing_pct:.1f}%", "Cells empty across the whole grid"),
+        ("era-tile-lg", "Rows", f"{rows:,}", "How many records are in this sheet"),
+        ("era-tile", "Columns", f"{columns:,}", "Fields we detected"),
+        ("era-tile", "Duplicates", f"{duplicates:,}", "Exact copies of another row"),
+        ("era-tile-lg", "Empty cells", f"{missing_pct:.1f}%", "Share of the grid with no value"),
     ]
     html = ['<div class="era-bento">']
     for cls, kicker, value, hint in specs:
@@ -602,13 +601,13 @@ def cleaning_nudge(findings: list[Finding]) -> None:
         f"""
         <div class="era-shell" style="margin:0 0 1.1rem">
           <div class="era-core">
-            <div class="era-kicker">Clean · then brief</div>
+            <div class="era-kicker">Clean this sheet first</div>
             <p class="era-lede" style="margin:0 0 0.9rem">
-              Missing values or duplicate rows will distort the briefing.
-              Clean the sheet first, then upload it here.
+              Missing values or duplicate rows will throw the briefing off.
+              Clean the file, then upload it again.
             </p>
             <a class="era-cta" href="{DATA_CLEANING_TOOL_URL}" target="_blank" rel="noopener">
-              Open Data Cleaning Tool
+              Open the data cleaner
               <span class="era-cta-icon">↗</span>
             </a>
           </div>
@@ -624,8 +623,8 @@ def insight_cards(findings: list[Finding]) -> None:
             """
             <div class="era-shell">
               <div class="era-core">
-                <div class="era-kicker">Clean pass</div>
-                <p class="era-lede" style="margin:0">No notable issues detected — this dataset looks clean.</p>
+                <div class="era-kicker">Nothing stood out</div>
+                <p class="era-lede" style="margin:0">This sheet looks straightforward. Still check the profile and charts below.</p>
               </div>
             </div>
             """,
@@ -642,7 +641,7 @@ def insight_cards(findings: list[Finding]) -> None:
               <div class="era-core era-insight">
                 <div class="era-index">{i:02d}</div>
                 <div>
-                  <div class="era-lane era-lane-{lane}">{lane}</div>
+                  <div class="era-lane era-lane-{lane}">{lane.title()}</div>
                   <p>{escape(item.sentence)}</p>
                   <p class="era-so-what">{escape(item.so_what)}</p>
                 </div>

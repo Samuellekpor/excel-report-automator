@@ -186,8 +186,8 @@ def _missing_insights(df: pd.DataFrame, n_rows: int) -> list[Finding]:
             out.append(
                 _finding(
                     "watch",
-                    f"Column '{col}' has {pct:.1%} missing values — worth cleaning before analysis.",
-                    "Those gaps can quietly shrink averages and hide the true mix.",
+                    f"'{col}' is {pct:.1%} empty — fill or drop those rows before you trust averages.",
+                    "Empty cells shrink averages and can hide the real mix.",
                     40 + float(pct) * 80,
                     "missing",
                 )
@@ -203,8 +203,8 @@ def _duplicate_insights(df: pd.DataFrame, n_rows: int) -> list[Finding]:
     return [
         _finding(
             "watch",
-            f"Dataset contains {dupes} duplicate rows ({share:.1%} of total).",
-            "Repeated rows will double-count totals until they are removed.",
+            f"{dupes} rows are exact copies of another row ({share:.1%} of the sheet).",
+            "Totals will be too high until those copies are removed.",
             38 + share * 80,
             "duplicate",
         )
@@ -231,15 +231,15 @@ def _outlier_insights(df: pd.DataFrame, numeric_cols: list[str]) -> list[Finding
             continue
         if len(high) >= len(low) and len(high) > 0:
             bound = _format_money_or_number(col, float(upper))
-            sentence = f"Detected {n_out} potential outliers in '{col}' (values above {bound})."
+            sentence = f"{n_out} unusually high values in '{col}' (above {bound})."
         else:
             bound = _format_money_or_number(col, float(lower))
-            sentence = f"Detected {n_out} potential outliers in '{col}' (values below {bound})."
+            sentence = f"{n_out} unusually low values in '{col}' (below {bound})."
         out.append(
             _finding(
                 "watch",
                 sentence,
-                "A few extreme values may be driving the mean more than the typical row.",
+                "A few extremes may be pulling the average away from a typical row.",
                 32 + min(n_out, 25),
                 "outlier",
             )
@@ -258,13 +258,13 @@ def _correlation_insights(df: pd.DataFrame, numeric_cols: list[str]) -> list[Fin
             if pd.isna(value) or abs(value) <= CORR_THRESHOLD:
                 continue
             if value < 0:
-                so_what = "When one rises the other tends to fall — a trade-off, not two independent facts."
+                so_what = "When one goes up, the other tends to go down — they are a trade-off, not two separate facts."
             else:
-                so_what = "These two move together — treat them as one story, not two separate ones."
+                so_what = "These two move together. Treat them as one story, not two."
             out.append(
                 _finding(
                     "explain",
-                    f"Strong correlation ({value:.2f}) between '{a}' and '{b}'.",
+                    f"'{a}' and '{b}' move together (correlation {value:.2f}).",
                     so_what,
                     48 + abs(float(value)) * 25,
                     "correlation",
@@ -305,12 +305,12 @@ def _trend_insights(
         if abs(pct_per_month) < TREND_MIN_ABS_PCT_PER_MONTH:
             continue
 
-        direction = "UP" if pct_per_month > 0 else "DOWN"
+        direction = "up" if pct_per_month > 0 else "down"
         out.append(
             _finding(
                 "explain",
-                f"'{num_col}' is trending {direction} ~{abs(pct_per_month):.1f}% per month over the period.",
-                "If this continues, run-rate will look very different from the period average.",
+                f"'{num_col}' is trending {direction} about {abs(pct_per_month):.1f}% per month.",
+                "If this keeps up, the run-rate will look different from the period average.",
                 52 + min(abs(pct_per_month), 40),
                 "trend",
             )
@@ -332,16 +332,16 @@ def _skew_insights(df: pd.DataFrame, numeric_cols: list[str]) -> list[Finding]:
         ratio = (mean - median) / std
         sample_skew = float(series.skew())
         if ratio > SKEW_STD_RATIO or sample_skew > 1.0:
-            sentence = f"Column '{col}' is heavily right-skewed (median much lower than mean)."
+            sentence = f"Typical '{col}' is well below the average (right-skewed)."
         elif ratio < -SKEW_STD_RATIO or sample_skew < -1.0:
-            sentence = f"Column '{col}' is heavily left-skewed (median much higher than mean)."
+            sentence = f"Typical '{col}' is well above the average (left-skewed)."
         else:
             continue
         out.append(
             _finding(
                 "explain",
                 sentence,
-                "The typical row is not the average — medians will tell a different story than totals.",
+                "The usual row is not the average — the median will tell a different story than the total.",
                 22 + min(abs(sample_skew), 8) * 2,
                 "skew",
             )
@@ -372,7 +372,8 @@ def _segment_insights(
     values = pd.to_numeric(df[hero], errors="coerce")
     candidates: list[Finding] = []
     for cat in categorical_cols:
-        frame = pd.DataFrame({"group": df[cat].astype(str), "value": values}).dropna()
+        frame = pd.DataFrame({"group": df[cat], "value": values}).dropna()
+        frame["group"] = frame["group"].astype(str)
         counts = frame["group"].value_counts()
         keep = counts[counts >= SEGMENT_MIN_PER_GROUP].index
         means = frame[frame["group"].isin(keep)].groupby("group")["value"].mean()
@@ -388,20 +389,23 @@ def _segment_insights(
             if top_val <= 0:
                 continue
             sentence = (
-                f"'{top_name}' leads '{cat}' on '{hero}' "
-                f"({_format_money_or_number(hero, top_val)} avg) versus '{bot_name}' near zero."
+                f"In '{cat}', '{top_name}' averages "
+                f"{_format_money_or_number(hero, top_val)} of '{hero}', "
+                f"while '{bot_name}' is near zero."
             )
             ratio = 3.0
         else:
             ratio = top_val / bot_val
             if ratio < SEGMENT_MIN_RATIO:
                 continue
-            sentence = f"'{top_name}' is {ratio:.1f}× '{bot_name}' on '{hero}'."
+            sentence = (
+                f"In '{cat}', '{top_name}' averages {ratio:.1f}× the '{hero}' of '{bot_name}'."
+            )
         candidates.append(
             _finding(
                 "explain",
                 sentence,
-                "The mix is doing more work than the overall average suggests — slice before you conclude.",
+                "The overall average hides that mix — look at the groups before you conclude.",
                 58 + min(ratio * 4, 24),
                 "segment",
             )
@@ -446,7 +450,7 @@ def _period_insights(
         _finding(
             "explain",
             f"'{hero}' is {direction} {abs(pct):.0f}% in {later} versus {earlier}.",
-            "The period average hides a shift — compare the two windows before you lock a target.",
+            "The overall average hides a shift — compare the two windows before you set a target.",
             60 + min(abs(pct), 30),
             "period",
         )
@@ -457,8 +461,8 @@ def _unique_id_insights(identifier_cols: list[str]) -> list[Finding]:
     return [
         _finding(
             "ignore",
-            f"Column '{col}' is fully unique — likely an identifier.",
-            "Useful as a key, but it should not be charted as a measure.",
+            f"'{col}' is unique on every row — treat it as an ID, not a measure.",
+            "Useful as a key. It should not be charted as a number.",
             6.0,
             "identifier",
         )
