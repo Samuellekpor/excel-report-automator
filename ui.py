@@ -558,7 +558,7 @@ def sidebar_chrome() -> None:
           <li><b>04</b><span>Download the Excel and PDF</span></li>
         </ol>
         <p class="era-note">Gaps and duplicate rows will skew the briefing. Clean first if the sheet looks messy.</p>
-        <a class="era-cta" href="{DATA_CLEANING_TOOL_URL}">
+        <a class="era-cta" href="{DATA_CLEANING_TOOL_URL}" target="_blank" rel="noopener">
           Open the data cleaner
           <span class="era-cta-icon">↗</span>
         </a>
