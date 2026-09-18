@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from io import BytesIO
 from typing import Any
+from xml.sax.saxutils import escape as xml_escape
 
 import matplotlib
 
@@ -382,6 +383,10 @@ def _build_excel(
     return output.getvalue()
 
 
+def _para(text: object, style) -> Paragraph:
+    return Paragraph(xml_escape(str(text)), style)
+
+
 def _build_pdf(
     df: pd.DataFrame,
     context: dict[str, Any],
@@ -441,15 +446,15 @@ def _build_pdf(
 
     story = []
     story.append(Spacer(1, 2.2 * inch))
-    story.append(Paragraph("Analyst briefing", cover_title))
+    story.append(_para("Analyst briefing", cover_title))
     if context.get("kind") == "executive":
-        story.append(Paragraph("Short briefing · 3 pages", cover_sub))
+        story.append(_para("Short briefing · 3 pages", cover_sub))
     else:
-        story.append(Paragraph("Full report", cover_sub))
-    story.append(Paragraph(context["source_name"], cover_sub))
+        story.append(_para("Full report", cover_sub))
+    story.append(_para(context["source_name"], cover_sub))
     if context["period"]:
-        story.append(Paragraph(context["period"], cover_sub))
-    story.append(Paragraph(context["prepared"], cover_sub))
+        story.append(_para(context["period"], cover_sub))
+    story.append(_para(context["prepared"], cover_sub))
     story.append(PageBreak())
 
     so_what = ParagraphStyle(
@@ -461,19 +466,15 @@ def _build_pdf(
         spaceAfter=10,
     )
 
-    story.append(Paragraph("Briefing", h1))
+    story.append(_para("Briefing", h1))
     if not briefing:
-        story.append(
-            Paragraph("Nothing stood out in this sheet.", body)
-        )
+        story.append(_para("Nothing stood out in this sheet.", body))
     else:
         for i, item in enumerate(briefing, start=1):
-            story.append(
-                Paragraph(f"{i}. [{item.lane.title()}] {item.sentence}", body)
-            )
-            story.append(Paragraph(item.so_what, so_what))
+            story.append(_para(f"{i}. [{item.lane.title()}] {item.sentence}", body))
+            story.append(_para(item.so_what, so_what))
 
-    story.append(Paragraph("Overview", h1))
+    story.append(_para("Overview", h1))
     overview_table = Table(
         [
             ["Metric", "Value"],
@@ -489,7 +490,7 @@ def _build_pdf(
     story.append(overview_table)
 
     if context.get("kind") != "executive" and types["numeric"]:
-        story.append(Paragraph("Number statistics", h1))
+        story.append(_para("Number statistics", h1))
         num_df = numeric_profile(df, types["numeric"])
         header = ["Column", "Count", "Mean", "Median", "Min", "Max", "Std", "Missing"]
         rows = [header]
@@ -513,7 +514,7 @@ def _build_pdf(
     if context.get("kind") != "executive":
         cat_cols = types["categorical"] + types["text"] + types["identifiers"]
         if cat_cols:
-            story.append(Paragraph("Categories and text", h1))
+            story.append(_para("Categories and text", h1))
             cat_header = ["Column", "Unique", "Missing", "Top values"]
             cat_rows = [cat_header]
             for profile in categorical_profile(df, cat_cols):
@@ -522,10 +523,10 @@ def _build_pdf(
                 )
                 cat_rows.append(
                     [
-                        Paragraph(str(profile["column"]), body),
+                        _para(profile["column"], body),
                         str(profile["unique_count"]),
                         str(profile["missing"]),
-                        Paragraph(top or "—", body),
+                        _para(top or "—", body),
                     ]
                 )
             cat_table = Table(cat_rows, colWidths=[1.4 * inch, 0.8 * inch, 0.9 * inch, 3.5 * inch], repeatRows=1)
@@ -534,25 +535,25 @@ def _build_pdf(
 
     if evidence_charts:
         story.append(PageBreak())
-        story.append(Paragraph("Charts", h1))
+        story.append(_para("Charts", h1))
         for name, png in evidence_charts:
-            story.append(Paragraph(name.replace("_", " "), body))
+            story.append(_para(name.replace("_", " "), body))
             img = Image(BytesIO(png))
             img._restrictSize(6.8 * inch, 3.8 * inch)
             story.append(img)
             story.append(Spacer(1, 10))
 
     if extra:
-        story.append(Paragraph("Appendix — also noted", h1))
+        story.append(_para("Appendix — also noted", h1))
         for item in extra:
-            story.append(Paragraph(f"[{item.lane.title()}] {item.sentence}", body))
-            story.append(Paragraph(item.so_what, so_what))
+            story.append(_para(f"[{item.lane.title()}] {item.sentence}", body))
+            story.append(_para(item.so_what, so_what))
 
     if appendix_charts:
         story.append(PageBreak())
-        story.append(Paragraph("Appendix — charts", h1))
+        story.append(_para("Appendix — charts", h1))
         for name, png in appendix_charts:
-            story.append(Paragraph(name.replace("_", " "), body))
+            story.append(_para(name.replace("_", " "), body))
             img = Image(BytesIO(png))
             img._restrictSize(6.8 * inch, 3.8 * inch)
             story.append(img)
