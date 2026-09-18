@@ -126,7 +126,7 @@ def _excel_safe(df: pd.DataFrame) -> pd.DataFrame:
 def _chart_images(df: pd.DataFrame, types: dict[str, list[str]]) -> list[tuple[str, bytes]]:
     images: list[tuple[str, bytes]] = []
 
-    for col in types["numeric"]:
+    for col in types["numeric"][:8]:
         series = pd.to_numeric(df[col], errors="coerce").dropna()
         if series.empty:
             continue
@@ -158,7 +158,8 @@ def _chart_images(df: pd.DataFrame, types: dict[str, list[str]]) -> list[tuple[s
         images.append((f"bar_{col}", _fig_to_png(fig)))
 
     if len(types["numeric"]) >= 2:
-        corr = df[types["numeric"]].apply(pd.to_numeric, errors="coerce").corr()
+        corr_cols = types["numeric"][:12]
+        corr = df[corr_cols].apply(pd.to_numeric, errors="coerce").corr()
         from matplotlib.colors import LinearSegmentedColormap
 
         cmap = LinearSegmentedColormap.from_list("era", CORR_CMAP)
