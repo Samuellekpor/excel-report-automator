@@ -80,8 +80,8 @@ def load_uploaded_file(uploaded_file) -> tuple[pd.DataFrame | None, str | None]:
             return df, None
 
         return None, f"This file type is not supported: .{suffix}"
-    except Exception as exc:
-        return None, f"We could not read this file. {exc}"
+    except Exception:
+        return None, "We could not read this file. Check the format and try again."
 
 
 def render_insights(df: pd.DataFrame) -> None:
