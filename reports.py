@@ -133,7 +133,7 @@ def _chart_images(df: pd.DataFrame, types: dict[str, list[str]]) -> list[tuple[s
             continue
         fig, ax = plt.subplots(figsize=(7.2, 3.6))
         ax.hist(series, bins=30, color=TEAL, edgecolor="white")
-        ax.set_title(f"Histogram — {col}", color=INK, loc="left")
+        ax.set_title(f"Spread of {col}", color=INK, loc="left")
         ax.set_xlabel(col)
         ax.set_ylabel("Count")
         ax.set_facecolor(CREAM)
