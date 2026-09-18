@@ -8,6 +8,11 @@ import streamlit as st
 from insights import classify_columns, coerce_datetime
 from ui import section_header
 
+
+@st.cache_data(show_spinner=False)
+def cached_classify_columns(df: pd.DataFrame):
+    return classify_columns(df)
+
 # Names match the Google Fonts <link> in inject_theme() (ui.py). Fallbacks
 # keep Plotly readable if a family does not load inside the chart surface.
 _CHART_SANS = "Plus Jakarta Sans, ui-sans-serif, system-ui, sans-serif"
@@ -51,7 +56,7 @@ def render_charts(df: pd.DataFrame) -> None:
         "See the patterns",
         "How values are spread, which categories show up most, how columns move together, and change over time — only when the data supports them.",
     )
-    types = classify_columns(df)
+    types = cached_classify_columns(df)
     numeric_cols = types["numeric"][:MAX_NUMERIC_CHARTS]
     cat_cols = types["categorical"][:MAX_CATEGORY_CHARTS]
     ts_cols = types["numeric"][:MAX_TIMESERIES_CHARTS]

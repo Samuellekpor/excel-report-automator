@@ -23,6 +23,21 @@ from ui import (
 SAMPLE_PATH = Path(__file__).with_name("sample_sales.csv")
 
 
+@st.cache_data(show_spinner=False)
+def cached_generate_findings(df: pd.DataFrame):
+    return generate_findings(df)
+
+
+@st.cache_data(show_spinner=False)
+def cached_dataset_overview(df: pd.DataFrame):
+    return dataset_overview(df)
+
+
+@st.cache_data(show_spinner=False)
+def cached_build_reports(df: pd.DataFrame, source_name: str, kind: str):
+    return build_reports(df, source_name, kind=kind)
+
+
 st.set_page_config(
     page_title="Excel Report Automator",
     layout="wide",
@@ -70,7 +85,7 @@ def load_uploaded_file(uploaded_file) -> tuple[pd.DataFrame | None, str | None]:
 
 
 def render_insights(df: pd.DataFrame) -> None:
-    all_findings = generate_findings(df)
+    all_findings = cached_generate_findings(df)
     briefing = rank_findings(all_findings)
     extra = supporting_findings(all_findings, briefing)
     section_header(
@@ -86,7 +101,7 @@ def render_insights(df: pd.DataFrame) -> None:
 
 
 def render_profiling(df: pd.DataFrame) -> None:
-    overview = dataset_overview(df)
+    overview = cached_dataset_overview(df)
     types = overview["types"]
     section_header(
         "02  ·  Profile",
@@ -198,7 +213,7 @@ def render_workspace(df: pd.DataFrame, source_name: str) -> None:
     report_kind = "executive" if kind_label.startswith("Executive") else "full"
     if st.button("Generate report", type="primary"):
         with st.spinner("Building Excel and PDF…"):
-            excel_bytes, pdf_bytes = build_reports(df, source_name, kind=report_kind)
+            excel_bytes, pdf_bytes = cached_build_reports(df, source_name, report_kind)
         st.session_state["excel_report"] = excel_bytes
         st.session_state["pdf_report"] = pdf_bytes
         st.session_state["report_stem"] = source_name.rsplit(".", 1)[0]
