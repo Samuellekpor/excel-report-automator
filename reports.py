@@ -297,8 +297,8 @@ def _build_excel(
             ("Rows", f"{overview['rows']:,}"),
             ("Columns", f"{overview['columns']:,}"),
             ("Duplicate rows", f"{overview['duplicate_rows']:,}"),
-            ("Missing cells", f"{overview['missing_cells']:,}"),
-            ("Empty cells", f"{overview['missing_pct']:.1f}%"),
+            ("Empty cells", f"{overview['missing_cells']:,}"),
+            ("Empty share", f"{overview['missing_pct']:.1f}%"),
         ]
         for label, value in metrics:
             summary.write(row, 0, label, label_fmt)
@@ -481,8 +481,8 @@ def _build_pdf(
             ["Rows", f"{overview['rows']:,}"],
             ["Columns", f"{overview['columns']:,}"],
             ["Duplicate rows", f"{overview['duplicate_rows']:,}"],
-            ["Missing cells", f"{overview['missing_cells']:,}"],
-            ["Empty cells", f"{overview['missing_pct']:.1f}%"],
+            ["Empty cells", f"{overview['missing_cells']:,}"],
+            ["Empty share", f"{overview['missing_pct']:.1f}%"],
         ],
         colWidths=[2.4 * inch, 4.2 * inch],
     )

@@ -125,8 +125,8 @@ def render_profiling(df: pd.DataFrame) -> None:
                 "Rows": overview["rows"],
                 "Columns": overview["columns"],
                 "Duplicate rows": overview["duplicate_rows"],
-                "Missing cells": overview["missing_cells"],
-                "Empty cells": f"{overview['missing_pct']:.1f}%",
+                "Empty cells": overview["missing_cells"],
+                "Empty share": f"{overview['missing_pct']:.1f}%",
             }
         )
 
