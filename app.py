@@ -8,6 +8,7 @@ import streamlit as st
 
 from charts import render_charts
 from insights import generate_findings, rank_findings, supporting_findings
+from license import license_gate
 from profiling import categorical_profile, dataset_overview, numeric_profile
 from reports import build_reports
 from ui import (
@@ -44,6 +45,9 @@ st.set_page_config(
     # Open on desktop; collapse on narrow viewports so the sidebar does not cover the hero.
     initial_sidebar_state="auto",
 )
+
+if not license_gate():
+    st.stop()
 
 inject_theme()
 
